@@ -1,0 +1,68 @@
+# ==============================================================================
+# Kubernetes Object: StorageClass
+# ==============================================================================
+# WHAT IS A STORAGECLASS?
+# A StorageClass provides a way for administrators to describe the "classes" of 
+# storage they offer (e.g. "fast" SSDs, "standard" HDDs, backup storage).
+#
+# DYNAMIC PROVISIONING:
+# Without StorageClasses, cluster admins had to manually create PersistentVolumes
+# upfront (static provisioning). With a StorageClass, when a user requests a 
+# PersistentVolumeClaim, the StorageClass dynamically talks to the underlying cloud
+# or storage backend (AWS EBS, GCP PD, Azure Disk, Ceph, NFS) to create the physical 
+# storage volume on demand!
+#
+# KEY FIELDS:
+# - provisioner: The volume plugin used for provisioning (e.g., ebs.csi.aws.com,
+#   pd.csi.storage.gke.io, disk.csi.azure.com).
+# - volumeBindingMode:
+#   * Immediate (Default): Allocates volume immediately when PVC is created.
+#   * WaitForFirstConsumer: Delays volume creation until a Pod using the PVC is 
+#     scheduled. Ensures the storage disk is created in the SAME AZ/zone as the pod!
+# - reclaimPolicy:
+#   * Delete (Default): Deletes the underlying cloud disk when PVC is deleted.
+#   * Retain: Keeps the physical disk even if the PVC is deleted (data preservation).
+#
+# IMPORTANT CLI COMMANDS:
+# - Apply:        kubectl apply -f storageclass.yaml
+# - Get:          kubectl get sc
+# - Describe:     kubectl describe sc fast-ssd-storage
+# ==============================================================================
+
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+
+metadata:
+  name: fast-ssd-storage
+  annotations:
+    # Set this StorageClass as the cluster default:
+    storageclass.kubernetes.io/is-default-class: "false"
+  labels:
+    tier: high-performance
+
+# The CSI driver provisioner plugin responsible for creating volumes
+# For local/lab environments:   kubernetes.io/no-provisioner
+# For AWS EBS (production):     ebs.csi.aws.com
+# For GCP Persistent Disk:      pd.csi.storage.gke.io
+# For Azure Disk:               disk.csi.azure.com
+provisioner: kubernetes.io/no-provisioner
+
+# Reclaim policy applied to dynamically created PersistentVolumes
+reclaimPolicy: Delete
+
+# Allows resizing the volume dynamically by editing the PVC request.storage field
+allowVolumeExpansion: true
+
+# WaitForFirstConsumer prevents multi-zone mismatch bugs!
+volumeBindingMode: WaitForFirstConsumer
+
+# ------------------------------------------------------------------------------
+# Driver-specific parameters (ONLY used by cloud CSI provisioners, NOT no-provisioner!)
+# Uncomment and change provisioner to a cloud CSI driver to use these.
+# ------------------------------------------------------------------------------
+# parameters:
+#   type: gp3                  # AWS EBS volume type (gp3, gp2, io2, st1, sc1)
+#   iops: "3000"               # Provisioned IOPS (gp3/io2 only)
+#   throughput: "125"           # Provisioned throughput in MiB/s (gp3 only)
+#   encrypted: "true"          # Enable encryption at rest
+

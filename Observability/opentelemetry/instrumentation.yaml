@@ -1,0 +1,78 @@
+# ==============================================================================
+# Observability Object: Instrumentation (OpenTelemetry Operator CRD)
+# ==============================================================================
+# WHAT IS THE INSTRUMENTATION CRD?
+# The `Instrumentation` resource enables ZERO-CODE automated tracing and metrics 
+# injection into applications written in:
+# - Java
+# - Node.js
+# - Python
+# - Go
+# - .NET
+#
+# HOW IT WORKS:
+# 1. Define this `Instrumentation` CRD specifying your OTel collector endpoint.
+# 2. Add a simple annotation to any Pod or Deployment:
+#    `instrumentation.opentelemetry.io/inject-java: "true"`
+#    (or `inject-nodejs: "true"`, `inject-python: "true"`, etc.)
+# 3. The OpenTelemetry Operator admission webhook automatically intercepts pod creation,
+#    mounts the OTel SDK agent, and configures environment variables transparently!
+# 4. Developers get instant distributed traces with ZERO application code changes!
+#
+# IMPORTANT CLI COMMANDS:
+# - Apply:        kubectl apply -f instrumentation.yaml
+# - Get:          kubectl get instrumentation
+# - Describe:     kubectl describe instrumentation auto-instrumentation
+# ==============================================================================
+
+apiVersion: opentelemetry.io/v1alpha1
+kind: Instrumentation
+
+metadata:
+  name: auto-instrumentation
+  namespace: default
+  labels:
+    tier: observability
+
+spec:
+  # OTLP endpoint where auto-instrumented SDKs should export traces & metrics
+  exporter:
+    endpoint: "http://otel-collector.default.svc.cluster.local:4318"
+
+  # ----------------------------------------------------------------------------
+  # Language Runtimes: SDK Configurations
+  # ----------------------------------------------------------------------------
+  # 1. Java Auto-Instrumentation
+  java:
+    image: ghcr.io/open-telemetry/opentelemetry-operator/autoinstrumentation-java:latest
+    env:
+      - name: OTEL_JAVAAGENT_DEBUG
+        value: "false"
+
+  # 2. Node.js Auto-Instrumentation
+  nodejs:
+    image: ghcr.io/open-telemetry/opentelemetry-operator/autoinstrumentation-nodejs:latest
+
+  # 3. Python Auto-Instrumentation
+  python:
+    image: ghcr.io/open-telemetry/opentelemetry-operator/autoinstrumentation-python:latest
+    env:
+      - name: OTEL_PYTHON_LOG_CORRELATION
+        value: "true"
+
+  # 4. Go Auto-Instrumentation (eBPF based)
+  go:
+    image: ghcr.io/open-telemetry/opentelemetry-go-instrumentation/autoinstrumentation-go:latest
+
+  # 5. .NET Auto-Instrumentation
+  dotnet:
+    image: ghcr.io/open-telemetry/opentelemetry-operator/autoinstrumentation-dotnet:latest
+
+  # ----------------------------------------------------------------------------
+  # Sampler Configuration
+  # ----------------------------------------------------------------------------
+  sampler:
+    # parentbased_traceidratio: Respects incoming trace decision, samples 25% of new traces
+    type: parentbased_traceidratio
+    argument: "0.25"
+

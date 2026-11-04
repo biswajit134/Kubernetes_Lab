@@ -1,0 +1,64 @@
+# ==============================================================================
+# Kubernetes Object: Deployment (Recreate Strategy)
+# ==============================================================================
+# WHAT IS THE RECREATE STRATEGY?
+# When strategy.type is set to "Recreate", Kubernetes kills ALL existing pods 
+# before any new pods are created.
+#
+# WHEN TO USE RECREATE:
+# - When two versions of the application CANNOT run simultaneously.
+# - E.g., Legacy applications with exclusive file locks on ReadWriteOnce (RWO) storage.
+# - E.g., Database migrations with non-backward-compatible schema transformations.
+#
+# DOWNSIDE:
+# - Causes noticeable DOWNTIME during updates (while old pods terminate and new pods spin up).
+#
+# IMPORTANT CLI COMMANDS:
+# - Apply:        kubectl apply -f deployment-recreate.yaml
+# - Watch:        kubectl get pods -w (observe old pods terminate before new ones start)
+# ==============================================================================
+
+apiVersion: apps/v1
+kind: Deployment
+
+metadata:
+  name: legacy-app-deployment
+  namespace: default
+  labels:
+    app: legacy-data-worker
+
+spec:
+  replicas: 2
+
+  strategy:
+    type: Recreate
+    # Note: 'rollingUpdate' field is NOT allowed when type is Recreate
+
+  selector:
+    matchLabels:
+      app: legacy-data-worker
+
+  template:
+    metadata:
+      labels:
+        app: legacy-data-worker
+    spec:
+      containers:
+        - name: worker
+          image: busybox:1.36
+          command: ["/bin/sh", "-c"]
+          args:
+            - >
+              echo "Starting exclusive database worker...";
+              while true; do
+                echo "Working exclusively...";
+                sleep 5;
+              done
+          resources:
+            requests:
+              cpu: "50m"
+              memory: "64Mi"
+            limits:
+              cpu: "100m"
+              memory: "128Mi"
+

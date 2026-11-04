@@ -1,0 +1,65 @@
+# ==============================================================================
+# Service Mesh Object: Sidecar (Istio Networking CRD)
+# ==============================================================================
+# WHAT IS A SIDECAR RESOURCE?
+# By default, Istio configures every Envoy sidecar proxy to be able to reach EVERY 
+# other service in the entire Kubernetes cluster across all namespaces.
+#
+# THE PROBLEM IN LARGE CLUSTERS:
+# In a cluster with hundreds or thousands of services, pushing the endpoint configuration 
+# for every single service to every sidecar causes:
+# 1. Massive memory consumption by Envoy proxies (hundreds of MBs per pod).
+# 2. High CPU usage on the control plane (istiod) calculating and pushing updates.
+# 3. Slow configuration distribution across the cluster.
+#
+# HOW THE SIDECAR RESOURCE FIXES THIS:
+# A Sidecar resource scopes and tunes the configuration of the sidecar proxies.
+# It restricts which services the proxy knows about, dramatically slashing memory 
+# usage from ~300MB down to ~20MB per pod!
+#
+# IMPORTANT CLI COMMANDS:
+# - Apply:        kubectl apply -f sidecar.yaml
+# - Get:          kubectl get sidecars
+# - Inspect Proxy:istioctl proxy-config clusters <pod-name>
+# ==============================================================================
+
+apiVersion: networking.istio.io/v1beta1
+kind: Sidecar
+
+metadata:
+  name: scoped-reviews-sidecar
+  namespace: default
+  labels:
+    tier: performance-tuning
+
+spec:
+  # ----------------------------------------------------------------------------
+  # Workload Selector: Which pods should have their sidecars scoped?
+  # If omitted, applies to all pods in the namespace.
+  # ----------------------------------------------------------------------------
+  workloadSelector:
+    labels:
+      app: reviews
+
+  # ----------------------------------------------------------------------------
+  # Ingress Listeners: Configure incoming traffic to the application container
+  # ----------------------------------------------------------------------------
+  ingress:
+    - port:
+        number: 9080
+        protocol: HTTP
+        name: reviews-http
+      # Forward incoming traffic on port 9080 to localhost:9080 (app container)
+      defaultEndpoint: 127.0.0.1:9080
+
+  # ----------------------------------------------------------------------------
+  # Egress Listeners: Restrict which outbound services this pod can see & reach
+  # ----------------------------------------------------------------------------
+  egress:
+    # --- Listener: Only send configuration for services in this namespace,
+    #     plus specific required external services (ratings and istio-system) ---
+    - hosts:
+        - "./*"                  # All services in the current namespace ('default')
+        - "ratings/*"            # Services in the 'ratings' namespace
+        - "istio-system/*"       # Telemetry and tracing services
+

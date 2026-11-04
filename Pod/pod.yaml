@@ -1,0 +1,138 @@
+# ==============================================================================
+# Kubernetes Object: Pod (Single Container)
+# ==============================================================================
+# WHAT IS A POD?
+# A Pod is the smallest deployable compute unit in Kubernetes. It represents a 
+# single instance of a running process in your cluster.
+#
+# A Pod encapsulates:
+# 1. One or more tightly coupled application containers.
+# 2. Shared storage assets (Volumes).
+# 3. A unique network IP address (containers in a Pod share the network namespace,
+#    meaning they communicate with each other via localhost).
+# 4. Configuration options that govern how containers should run.
+#
+# NOTE: In production, Pods are rarely created directly. Instead, higher-level 
+# controllers like Deployments, StatefulSets, or DaemonSets manage them.
+#
+# IMPORTANT CLI COMMANDS:
+# - Run/Apply:   kubectl apply -f pod.yaml
+# - Get Pods:    kubectl get pods -o wide
+# - Inspect:     kubectl describe pod web-app-pod
+# - View Logs:   kubectl logs web-app-pod -f
+# - Exec Shell:  kubectl exec -it web-app-pod -- /bin/sh
+# - Port Forward:kubectl port-forward pod/web-app-pod 8080:80
+# - Delete:      kubectl delete -f pod.yaml
+# ==============================================================================
+
+apiVersion: v1
+kind: Pod
+
+metadata:
+  # Name must be unique within the namespace
+  name: web-app-pod
+  namespace: default
+  # Labels allow controllers, services, and queries to select this Pod
+  labels:
+    app.kubernetes.io/name: web-app
+    app.kubernetes.io/instance: web-app-dev
+    app.kubernetes.io/version: "1.25.0"
+    app.kubernetes.io/component: frontend
+    app.kubernetes.io/part-of: ecommerce-suite
+    tier: frontend
+    environment: development
+
+  # Annotations hold non-identifying metadata, tooling hints, or documentation
+  annotations:
+    build-number: "1042"
+    maintainer: "devops-team@company.internal"
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "80"
+
+spec:
+  # ----------------------------------------------------------------------------
+  # Pod-Level Security Context
+  # ----------------------------------------------------------------------------
+  securityContext:
+    # Run the containers as a non-root user (security best practice)
+    runAsNonRoot: true
+    # UID/GID 101 is the 'nginx' user built into the nginxinc/nginx-unprivileged image.
+    # Always match the user that the container image expects; using an arbitrary UID
+    # (e.g., 10001) will fail unless the image supports running as any user.
+    runAsUser: 101
+    runAsGroup: 101
+    # Filesystem group owner for any attached volumes
+    fsGroup: 101
+
+  # ----------------------------------------------------------------------------
+  # Restart Policy: Always, OnFailure, Never (Default: Always)
+  # ----------------------------------------------------------------------------
+  restartPolicy: Always
+
+  # Grace period allowed for processes in the container to clean up on shutdown
+  terminationGracePeriodSeconds: 30
+
+  # ----------------------------------------------------------------------------
+  # Containers Array: The list of containers that belong to the pod
+  # ----------------------------------------------------------------------------
+  containers:
+    - name: nginx-webserver
+      # Docker/OCI Image to pull and run
+      image: nginxinc/nginx-unprivileged:1.25-alpine
+      
+      # Image Pull Policy:
+      # - Always: Always pull the image from registry (mandatory if tag is :latest)
+      # - IfNotPresent: Pull only if the node doesn't already have the image cached
+      # - Never: Only run locally cached images
+      imagePullPolicy: IfNotPresent
+
+      # Exposed network ports (mostly informational for documentation & service mapping)
+      ports:
+        - name: http-port
+          containerPort: 8080
+          protocol: TCP
+
+      # Environment variables directly defined in the manifest
+      env:
+        - name: APP_ENV
+          value: "development"
+        - name: LOG_LEVEL
+          value: "debug"
+        # Example of Downward API: injects Kubernetes metadata into container env
+        - name: POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        - name: POD_NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
+        - name: POD_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+
+      # ------------------------------------------------------------------------
+      # Resource Management: Requests vs Limits
+      # ------------------------------------------------------------------------
+      resources:
+        # Requests: Guaranteed minimum resources reserved on the node by scheduler
+        requests:
+          cpu: "100m"         # 100 millicores (0.1 CPU core)
+          memory: "128Mi"     # 128 Megabytes
+
+        # Limits: Hard ceiling; CPU is throttled if exceeded; Memory causes OOMKill
+        limits:
+          cpu: "500m"         # 500 millicores (0.5 CPU core)
+          memory: "256Mi"     # 256 Megabytes
+
+      # ------------------------------------------------------------------------
+      # Container-Level Security Context
+      # ------------------------------------------------------------------------
+      securityContext:
+        allowPrivilegeEscalation: false
+        readOnlyRootFilesystem: false
+        capabilities:
+          drop:
+            - ALL             # Drop all Linux root capabilities for safety
+

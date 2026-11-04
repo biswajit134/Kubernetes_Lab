@@ -1,0 +1,62 @@
+# ==============================================================================
+# Observability Object: PodMonitor (Prometheus Operator CRD)
+# ==============================================================================
+# WHAT IS A PODMONITOR?
+# While a `ServiceMonitor` requires a Kubernetes `Service` to discover pods,
+# a `PodMonitor` scrapes metrics DIRECTLY from Pods without needing a Service!
+#
+# WHEN TO USE PODMONITOR (VS SERVICEMONITOR):
+# 1. DaemonSets: Often run on host networks or don't expose a unified Service.
+# 2. Batch Jobs / CronJobs: Ephemeral pods that run to completion and lack a Service.
+# 3. Micro-agents: Internal log collectors, sidecars, or node monitoring agents.
+# 4. Any Pod that has no associated ClusterIP or Service abstraction.
+#
+# IMPORTANT CLI COMMANDS:
+# - Apply:        kubectl apply -f podmonitor.yaml
+# - Get:          kubectl get podmonitor (or pm) -A
+# - Describe:     kubectl describe pm agent-pod-monitor
+# ==============================================================================
+
+apiVersion: monitoring.coreos.com/v1
+kind: PodMonitor
+
+metadata:
+  name: agent-pod-monitor
+  namespace: default
+  labels:
+    release: prometheus-stack
+    tier: monitoring
+
+spec:
+  # ----------------------------------------------------------------------------
+  # Selector: Matches labels directly on POD metadata (not Service!)
+  # ----------------------------------------------------------------------------
+  selector:
+    matchLabels:
+      app: inventory-worker
+      tier: backend
+
+  # ----------------------------------------------------------------------------
+  # NamespaceSelector: Namespaces where these Pods reside
+  # ----------------------------------------------------------------------------
+  namespaceSelector:
+    matchNames:
+      - default
+
+  # ----------------------------------------------------------------------------
+  # PodMetricsEndpoints: Container ports to scrape directly
+  # ----------------------------------------------------------------------------
+  podMetricsEndpoints:
+    - # Port name defined in the container's ports[].name specification
+      port: metrics
+      path: /metrics
+      interval: 30s
+      scrapeTimeout: 10s
+      scheme: http
+
+      # Attach Pod metadata labels to the scraped time-series
+      relabelings:
+        - sourceLabels: [__meta_kubernetes_pod_node_name]
+          targetLabel: node
+          action: replace
+

@@ -1,0 +1,64 @@
+# ==============================================================================
+# Kubernetes Object: PersistentVolume (PV)
+# ==============================================================================
+# WHAT IS A PERSISTENTVOLUME?
+# A PersistentVolume (PV) is a piece of storage in the cluster that has been 
+# provisioned by an administrator or dynamically provisioned using Storage Classes.
+#
+# KEY CHARACTERISTICS:
+# - Cluster-Scoped: PVs do NOT belong to any namespace (they are cluster-wide).
+# - Independent Lifecycle: A PV's lifecycle is completely independent of any 
+#   individual Pod that uses it. Even if all Pods die, the data remains intact.
+#
+# ACCESS MODES:
+# - ReadWriteOnce (RWO): Mounted as read-write by a SINGLE node.
+# - ReadOnlyMany  (ROX): Mounted as read-only by MANY nodes simultaneously.
+# - ReadWriteMany (RWX): Mounted as read-write by MANY nodes (requires NFS/GlusterFS/CephFS).
+# - ReadWriteOncePod (RWOP): Mounted as read-write by a SINGLE POD only (Kubernetes 1.22+).
+#
+# RECLAIM POLICIES:
+# - Retain: When PVC is deleted, PV remains in 'Released' state; data is preserved.
+# - Delete: Underlying storage asset (e.g. cloud disk) is deleted automatically.
+# - Recycle (Deprecated): Performs basic scrub (rm -rf /thevolume/*).
+#
+# IMPORTANT CLI COMMANDS:
+# - Apply:        kubectl apply -f persistentvolume.yaml
+# - Get PVs:      kubectl get pv
+# - Describe:     kubectl describe pv local-data-pv
+# ==============================================================================
+
+apiVersion: v1
+kind: PersistentVolume
+
+metadata:
+  name: local-data-pv
+  labels:
+    type: local-storage
+    environment: lab
+
+spec:
+  # Capacity allocated for this volume
+  capacity:
+    storage: 10Gi
+
+  # Volume mode: Filesystem (default) or Block
+  volumeMode: Filesystem
+
+  # Access Modes supported by this volume
+  accessModes:
+    - ReadWriteOnce
+
+  # Reclaim policy when PVC is deleted
+  persistentVolumeReclaimPolicy: Retain
+
+  # Associated StorageClass (can be empty string for manual binding)
+  storageClassName: manual-storage
+
+  # ----------------------------------------------------------------------------
+  # Underlying Volume Source (Example using hostPath for local lab / Minikube)
+  # In production, this would be an NFS share, CSI volume, or cloud disk.
+  # ----------------------------------------------------------------------------
+  hostPath:
+    path: /mnt/data
+    type: DirectoryOrCreate
+

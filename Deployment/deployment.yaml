@@ -1,0 +1,115 @@
+# ==============================================================================
+# Kubernetes Object: Deployment (RollingUpdate Strategy)
+# ==============================================================================
+# WHAT IS A DEPLOYMENT?
+# A Deployment provides declarative updates for Pods and ReplicaSets. You describe 
+# a desired state in a Deployment, and the Deployment Controller changes the actual 
+# state to the desired state at a controlled rate.
+#
+# KEY ADVANTAGES OVER REPLICASETS:
+# 1. Zero-Downtime Updates: RollingUpdate replaces old pods with new ones gradually.
+# 2. Version Rollbacks: Instantly roll back to previous revisions if a release fails.
+# 3. Scaling & Pausing: Scale up/down or pause rollout to test canary pods.
+# 4. History Tracking: Maintains historical ReplicaSets based on revisionHistoryLimit.
+#
+# IMPORTANT CLI COMMANDS:
+# - Apply:             kubectl apply -f deployment.yaml
+# - Check Rollout:     kubectl rollout status deployment/web-deployment
+# - Rollout History:   kubectl rollout history deployment/web-deployment
+# - Rollback to Prev:  kubectl rollout undo deployment/web-deployment
+# - Rollback to Rev:   kubectl rollout undo deployment/web-deployment --to-revision=2
+# - Pause Rollout:     kubectl rollout pause deployment/web-deployment
+# - Resume Rollout:    kubectl rollout resume deployment/web-deployment
+# - Restart Pods:      kubectl rollout restart deployment/web-deployment
+# - Scale:             kubectl scale deployment/web-deployment --replicas=5
+# ==============================================================================
+
+apiVersion: apps/v1
+kind: Deployment
+
+metadata:
+  name: web-deployment
+  namespace: default
+  labels:
+    app.kubernetes.io/name: web-deployment
+    app.kubernetes.io/part-of: online-store
+    environment: production
+
+spec:
+  # Desired number of identical pods
+  replicas: 4
+
+  # Keep track of last N ReplicaSets for rollback history (default is 10)
+  revisionHistoryLimit: 5
+
+  # Minimum seconds for which a newly created Pod should be ready without any of its
+  # containers crashing, for it to be considered available (helps catch crash loops).
+  minReadySeconds: 5
+
+  # ----------------------------------------------------------------------------
+  # Deployment Strategy
+  # ----------------------------------------------------------------------------
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      # maxSurge: Maximum number (or %) of pods that can be created OVER desired replicas.
+      # E.g., with replicas=4 and maxSurge=25% (1 pod), up to 5 pods can exist during rollout.
+      maxSurge: 25%
+
+      # maxUnavailable: Maximum number (or %) of pods that can be unavailable during update.
+      # E.g., with replicas=4 and maxUnavailable=25% (1 pod), at least 3 pods will always be running.
+      maxUnavailable: 25%
+
+  # ----------------------------------------------------------------------------
+  # Label Selector: Identifies which pods belong to this deployment
+  # ----------------------------------------------------------------------------
+  selector:
+    matchLabels:
+      app: web-store
+      tier: frontend
+
+  # ----------------------------------------------------------------------------
+  # Pod Template
+  # ----------------------------------------------------------------------------
+  template:
+    metadata:
+      labels:
+        app: web-store
+        tier: frontend
+        environment: production
+    spec:
+      terminationGracePeriodSeconds: 30
+
+      containers:
+        - name: web-store-app
+          image: nginx:1.25.3-alpine
+          imagePullPolicy: IfNotPresent
+
+          ports:
+            - name: http
+              containerPort: 80
+
+          # Readiness Probe: Vital for Rolling Updates!
+          # Kubernetes will NOT kill an old pod until the new pod's readiness probe passes.
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 80
+            initialDelaySeconds: 3
+            periodSeconds: 5
+
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 80
+            initialDelaySeconds: 10
+            periodSeconds: 10
+
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "128Mi"
+            limits:
+              cpu: "300m"
+              memory: "256Mi"
+

@@ -1,0 +1,94 @@
+# ==============================================================================
+# Kubernetes Object: Ingress
+# ==============================================================================
+# WHAT IS AN INGRESS?
+# Ingress exposes HTTP and HTTPS routes from outside the cluster to services 
+# within the cluster. Traffic routing is controlled by rules defined on the Ingress resource.
+#
+# INGRESS VS LOADBALANCER SERVICE:
+# - A LoadBalancer Service provisions an expensive external cloud load balancer 
+#   for EVERY single service (1 Service = 1 Cloud LB = high cost).
+# - An Ingress acts as a smart reverse proxy (Layer 7 / HTTP/HTTPS router). 
+#   A single Ingress Controller (and one cloud LB) can route traffic to dozens 
+#   of different microservices based on domain name (host) or URL path!
+#
+# PREREQUISITE:
+# You must have an Ingress Controller running in your cluster (e.g. ingress-nginx,
+# Traefik, Emissary-ingress, or AWS Load Balancer Controller).
+#
+# IMPORTANT CLI COMMANDS:
+# - Apply:        kubectl apply -f ingress.yaml
+# - Get Ingress:  kubectl get ingress
+# - Describe:     kubectl describe ingress main-app-ingress
+# ==============================================================================
+
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+
+metadata:
+  name: main-app-ingress
+  namespace: default
+  labels:
+    app: api-gateway
+  annotations:
+    # Controller specific annotations (example: ingress-nginx)
+    nginx.ingress.kubernetes.io/rewrite-target: /
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/proxy-body-size: "10m"
+    # Cert-Manager annotation for automated Let's Encrypt SSL certificates
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+
+spec:
+  # IngressClass indicates which Ingress Controller should implement this resource
+  ingressClassName: nginx
+
+  # ----------------------------------------------------------------------------
+  # TLS Configuration: Enables HTTPS termination at the ingress level
+  # ----------------------------------------------------------------------------
+  tls:
+    - hosts:
+        - api.mycompany.com
+        - store.mycompany.com
+      # Name of the Secret containing tls.crt and tls.key
+      secretName: example-tls-cert
+
+  # ----------------------------------------------------------------------------
+  # Routing Rules
+  # ----------------------------------------------------------------------------
+  rules:
+    # --- Rule 1: Host-based routing for api.mycompany.com ---
+    - host: api.mycompany.com
+      http:
+        paths:
+          # PathType can be:
+          # - Prefix: Matches URL path prefix (e.g., /v1 matches /v1, /v1/users, /v1/items)
+          # - Exact: Matches the URL path exactly
+          # - ImplementationSpecific: Depends on the IngressClass controller
+          - path: /v1
+            pathType: Prefix
+            backend:
+              service:
+                name: backend-service
+                port:
+                  number: 80
+
+          - path: /auth
+            pathType: Prefix
+            backend:
+              service:
+                name: auth-service
+                port:
+                  number: 8080
+
+    # --- Rule 2: Host-based routing for store.mycompany.com ---
+    - host: store.mycompany.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: web-nodeport-service
+                port:
+                  number: 80
+

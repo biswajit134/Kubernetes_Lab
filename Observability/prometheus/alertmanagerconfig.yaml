@@ -1,0 +1,90 @@
+# ==============================================================================
+# Observability Object: AlertmanagerConfig (Prometheus Operator CRD)
+# ==============================================================================
+# WHAT IS AN ALERTMANAGERCONFIG?
+# Alertmanager handles deduplicating, grouping, and routing alerts to external 
+# notification systems (Slack, PagerDuty, Opsgenie, Webhooks, Email).
+#
+# WHY ALERTMANAGERCONFIG CRD?
+# Historically, all alert routing lived in a single global `alertmanager.yaml`.
+# `AlertmanagerConfig` allows individual product teams to manage their own alert 
+# routing declaratively within their OWN namespace without touching cluster-wide settings!
+#
+# KEY ROUTING CONCEPTS:
+# - Route: Defines how alerts are grouped and which receiver gets them.
+# - Matchers: Filters alerts based on labels (e.g., `severity: critical`).
+# - Receivers: Target notification destinations (Slack webhooks, PagerDuty keys).
+#
+# IMPORTANT CLI COMMANDS:
+# - Apply:        kubectl apply -f alertmanagerconfig.yaml
+# - Get:          kubectl get alertmanagerconfigs (or amc) -A
+# - Describe:     kubectl describe amc backend-team-alerts
+# ==============================================================================
+
+apiVersion: monitoring.coreos.com/v1alpha1
+kind: AlertmanagerConfig
+
+metadata:
+  name: backend-team-alerts
+  namespace: default
+  labels:
+    alertmanagerConfig: backend-team
+
+spec:
+  # ----------------------------------------------------------------------------
+  # Route: Tree of routing rules for incoming alerts
+  # ----------------------------------------------------------------------------
+  route:
+    # Default fallback receiver
+    receiver: "slack-notifications"
+
+    # Group alerts by alertname and service to avoid alert storms
+    groupBy: ["alertname", "app", "namespace"]
+
+    # How long to wait before sending the first batch of grouped alerts
+    groupWait: 30s
+
+    # How long to wait before sending a new alert for an existing group
+    groupInterval: 5m
+
+    # How long to wait before re-sending an alert that is still firing
+    repeatInterval: 4h
+
+    # Sub-routes for critical escalation
+    routes:
+      - receiver: "pagerduty-oncall"
+        matchers:
+          - name: severity
+            value: critical
+            matchType: =
+
+  # ----------------------------------------------------------------------------
+  # Receivers: Where to deliver alerts
+  # ----------------------------------------------------------------------------
+  receivers:
+    # --- Receiver 1: Slack Channel ---
+    - name: "slack-notifications"
+      slackConfigs:
+        - channel: "#backend-alerts"
+          sendResolved: true
+          apiURL:
+            # Secret holding the sensitive Slack webhook URL
+            name: alertmanager-notification-secrets
+            key: slack-webhook-url
+          title: '[{{ .Status | toUpper }}] {{ .CommonLabels.alertname }} ({{ .CommonLabels.severity }})'
+          text: >-
+            *Alert:* {{ .CommonAnnotations.summary }}
+            *Description:* {{ .CommonAnnotations.description }}
+            *Details:*
+            {{ range .Alerts }}
+              • *Instance:* `{{ .Labels.instance }}`
+            {{ end }}
+
+    # --- Receiver 2: PagerDuty High-Priority Escalation ---
+    - name: "pagerduty-oncall"
+      pagerdutyConfigs:
+        - sendResolved: true
+          routingKey:
+            name: alertmanager-notification-secrets
+            key: pagerduty-service-key
+

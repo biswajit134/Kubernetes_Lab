@@ -1,0 +1,99 @@
+# ==============================================================================
+# Kubernetes Object: CronJob
+# ==============================================================================
+# WHAT IS A CRONJOB?
+# A CronJob creates Jobs on a repeating schedule based on the standard Cron syntax.
+# It is essentially a time-based Job controller.
+#
+# CRON SCHEDULE SYNTAX:
+# ┌───────────── minute (0 - 59)
+# │ ┌───────────── hour (0 - 23)
+# │ │ ┌───────────── day of the month (1 - 31)
+# │ │ │ ┌───────────── month (1 - 12)
+# │ │ │ │ ┌───────────── day of the week (0 - 6) (Sunday to Saturday)
+# │ │ │ │ │
+# * * * * *
+# Examples:
+#   "*/5 * * * *"   -> Every 5 minutes
+#   "0 2 * * *"     -> Daily at 2:00 AM
+#   "0 0 * * 0"     -> Every Sunday at midnight
+#   "@hourly"       -> Every hour
+#
+# CONCURRENCY POLICIES:
+# 1. Allow (Default): Multiple jobs can run simultaneously.
+# 2. Forbid: If previous job hasn't finished, skip the new scheduled execution!
+# 3. Replace: If previous job hasn't finished, cancel it and start the new one!
+#
+# IMPORTANT CLI COMMANDS:
+# - Apply:             kubectl apply -f cronjob.yaml
+# - Get CronJobs:      kubectl get cronjob (or cj)
+# - Trigger manually:  kubectl create job --from=cronjob/daily-db-backup manual-backup-1
+# - Pause/Suspend:     kubectl patch cronjob daily-db-backup -p '{"spec":{"suspend":true}}'
+# ==============================================================================
+
+apiVersion: batch/v1
+kind: CronJob
+
+metadata:
+  name: daily-db-backup
+  namespace: default
+  labels:
+    purpose: automated-backup
+    schedule: daily
+
+spec:
+  # Standard 5-field cron expression (Runs every day at 01:00 AM UTC)
+  schedule: "0 1 * * *"
+
+  # Timezone specification (Kubernetes 1.27+ GA)
+  timeZone: "Etc/UTC"
+
+  # Concurrency Policy:
+  # 'Forbid' ensures we never run two backup jobs at the same time!
+  concurrencyPolicy: Forbid
+
+  # Deadline in seconds for starting the job if it missed its scheduled time
+  startingDeadlineSeconds: 200
+
+  # History limits: How many completed/failed jobs to keep in cluster history
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 1
+
+  # Suspend: If true, future executions are paused
+  suspend: false
+
+  # ----------------------------------------------------------------------------
+  # Job Template: Defines the Job created at each scheduled interval
+  # ----------------------------------------------------------------------------
+  jobTemplate:
+    spec:
+      # Max retries before marking this job instance as failed
+      backoffLimit: 2
+
+      # Pod template for the job
+      template:
+        metadata:
+          labels:
+            job: daily-db-backup-runner
+        spec:
+          restartPolicy: OnFailure
+          containers:
+            - name: backup-runner
+              image: busybox:1.36
+              command: ["/bin/sh", "-c"]
+              args:
+                - >
+                  echo "Backup snapshot started at $(date)...";
+                  echo "Creating database dump...";
+                  sleep 4;
+                  echo "Uploading backup to cloud archive...";
+                  sleep 2;
+                  echo "Backup completed successfully!";
+              resources:
+                requests:
+                  cpu: "100m"
+                  memory: "64Mi"
+                limits:
+                  cpu: "250m"
+                  memory: "128Mi"
+

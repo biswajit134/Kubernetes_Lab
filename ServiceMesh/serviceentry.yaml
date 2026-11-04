@@ -1,0 +1,63 @@
+# ==============================================================================
+# Service Mesh Object: ServiceEntry (Istio Networking CRD)
+# ==============================================================================
+# WHAT IS A SERVICEENTRY?
+# By default, a service mesh only knows about services registered inside Kubernetes
+# (Pods and Services in the cluster).
+#
+# A ServiceEntry allows you to add external services (outside the cluster) into the
+# mesh's internal service registry.
+#
+# WHY USE A SERVICEENTRY?
+# 1. Apply Mesh Features to External Services: Configure timeouts, retries, and
+#    fault injection for third-party SaaS APIs (e.g., Stripe, Twilio, AWS DynamoDB).
+# 2. Outbound Traffic Monitoring: Trace and monitor egress calls in Prometheus/Kiali.
+# 3. Secure Egress: Combine with Egress Gateways to route external calls through a
+#    dedicated, hardened exit node.
+# 4. Multi-Cluster Federation: Register services running in another Kubernetes cluster.
+#
+# IMPORTANT CLI COMMANDS:
+# - Apply:        kubectl apply -f serviceentry.yaml
+# - Get:          kubectl get serviceentries (or se)
+# - Describe:     kubectl describe se external-payment-api
+# ==============================================================================
+
+apiVersion: networking.istio.io/v1beta1
+kind: ServiceEntry
+
+metadata:
+  name: external-payment-api
+  namespace: default
+  labels:
+    tier: external-integration
+
+spec:
+  # The external hostname used by internal pods to make requests
+  hosts:
+    - api.stripe.com
+
+  # Resolution mode:
+  # - DNS: Proxy resolves hostname via DNS dynamically
+  # - STATIC: Static IP addresses specified in 'endpoints'
+  # - NONE: No resolution; used for IP-routed or passthrough traffic
+  resolution: DNS
+
+  # Location:
+  # - MESH_EXTERNAL: Points to a service outside the mesh network
+  # - MESH_INTERNAL: Points to a service inside the mesh (e.g. another cluster)
+  location: MESH_EXTERNAL
+
+  # Exposed ports on the external service
+  ports:
+    - number: 443
+      name: https
+      protocol: HTTPS
+    - number: 80
+      name: http
+      protocol: HTTP
+
+  # ExportTo specifies which namespaces can see this ServiceEntry
+  # '.' means current namespace; '*' means all namespaces in the cluster
+  exportTo:
+    - "."
+

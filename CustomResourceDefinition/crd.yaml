@@ -1,0 +1,107 @@
+# ==============================================================================
+# Kubernetes Object: CustomResourceDefinition (CRD)
+# ==============================================================================
+# WHAT IS A CUSTOMRESOURCEDEFINITION (CRD)?
+# Kubernetes comes with standard built-in objects (Pods, Services, Deployments).
+# A CRD allows you to EXTEND the Kubernetes API with your own custom resource types.
+#
+# HOW OPERATORS WORK:
+# When you define a CRD (the data schema) and pair it with a Custom Controller 
+# (the software loop), you create an "Operator" (e.g. Prometheus Operator,
+# Postgres Operator, Cert-Manager).
+#
+# KEY COMPONENTS:
+# - group: DNS domain defining your API group (e.g. database.example.com).
+# - scope: Namespaced or Cluster.
+# - names: Plural, singular, kind, and short names for kubectl commands.
+# - versions: Schema definition with OpenAPI v3 validation rules.
+# - subresources: status and scale support.
+#
+# IMPORTANT CLI COMMANDS:
+# - Apply:        kubectl apply -f crd.yaml
+# - Get CRDs:     kubectl get crd
+# - Describe CRD: kubectl describe crd databases.company.example.com
+# - Check API:    kubectl api-resources | grep company
+# ==============================================================================
+
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+
+metadata:
+  # The name MUST follow the format: <plural-name>.<group>
+  name: databases.company.example.com
+
+spec:
+  # The API group under which this resource will be exposed
+  group: company.example.com
+
+  # Scope can be 'Namespaced' or 'Cluster'
+  scope: Namespaced
+
+  # ----------------------------------------------------------------------------
+  # Resource Naming Conventions
+  # ----------------------------------------------------------------------------
+  names:
+    plural: databases
+    singular: database
+    kind: Database
+    # Short names allow: 'kubectl get db'
+    shortNames:
+      - db
+
+  # ----------------------------------------------------------------------------
+  # Versions & OpenAPI v3 Validation Schema
+  # ----------------------------------------------------------------------------
+  versions:
+    - name: v1alpha1
+      # Served determines if this version is exposed via the API
+      served: true
+      # Storage determines which version is stored in etcd (only one can be true)
+      storage: true
+
+      # Additional printer columns displayed when running 'kubectl get db'
+      additionalPrinterColumns:
+        - name: Engine
+          type: string
+          jsonPath: .spec.engine
+        - name: Version
+          type: string
+          jsonPath: .spec.version
+        - name: Status
+          type: string
+          jsonPath: .status.phase
+
+      # Subresources enable '/status' endpoint and '/scale' subresource
+      subresources:
+        status: {}
+
+      # OpenAPI v3 Schema Validation
+      schema:
+        openAPIV3Schema:
+          type: object
+          properties:
+            spec:
+              type: object
+              required: ["engine", "version", "storageSize"]
+              properties:
+                engine:
+                  type: string
+                  enum: ["postgres", "mysql", "mongodb"]
+                version:
+                  type: string
+                replicas:
+                  type: integer
+                  minimum: 1
+                  maximum: 5
+                  default: 1
+                storageSize:
+                  type: string
+                  pattern: "^[0-9]+(Gi|Mi)$"
+            status:
+              type: object
+              properties:
+                phase:
+                  type: string
+                endpoint:
+                  type: string
+

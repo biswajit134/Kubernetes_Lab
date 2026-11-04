@@ -1,0 +1,118 @@
+# ==============================================================================
+# Service Mesh Object: VirtualService (Istio Networking CRD)
+# ==============================================================================
+# WHAT IS A VIRTUALSERVICE?
+# A VirtualService defines a set of traffic routing rules to apply when a host is 
+# addressed. Each routing rule defines matching criteria for traffic of a specific 
+# protocol. If the traffic is matched, then it is sent to a named destination service 
+# (or subset/version of it) defined in the service registry.
+#
+# KEY CAPABILITIES:
+# 1. Traffic Splitting / Canary Deployments: Send 90% of users to v1 and 10% to v2.
+# 2. Advanced Match Rules: Match on HTTP headers, URI paths, query params, cookies.
+# 3. Fault Injection: Inject artificial delays or HTTP abort codes to test resilience.
+# 4. Resilience Controls: Configure automated retries and request timeouts.
+# 5. URI Rewriting & Redirects: Modify paths or issue 301/302 redirects.
+#
+# HOW IT WORKS WITH DESTINATIONRULE:
+# - VirtualService: Decides WHERE to route traffic (e.g., subset "v1" vs "v2").
+# - DestinationRule: Defines WHAT "v1" and "v2" mean (labels) and HOW traffic is
+#   handled (load balancing, circuit breaking, mTLS).
+#
+# IMPORTANT CLI COMMANDS:
+# - Apply:        kubectl apply -f virtualservice.yaml
+# - Get:          kubectl get virtualservices (or vs)
+# - Describe:     kubectl describe vs reviews-route
+# - Analyze:      istioctl analyze -n default
+# ==============================================================================
+
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+
+metadata:
+  name: reviews-route
+  namespace: default
+  labels:
+    app: reviews
+    tier: service-mesh
+
+spec:
+  # The destination hosts to which traffic is being directed.
+  # Can be internal Kubernetes DNS names or Gateway names.
+  hosts:
+    - reviews.default.svc.cluster.local
+    - reviews
+
+  # The names of gateways and sidecars that should apply these routes.
+  # 'mesh' applies rules to internal service-to-service pod communications.
+  # If binding to an ingress gateway, include the gateway resource name here.
+  gateways:
+    - mesh
+    - default/public-gateway
+
+  # ----------------------------------------------------------------------------
+  # HTTP Routing Rules (evaluated in top-down sequential order)
+  # ----------------------------------------------------------------------------
+  http:
+    # --------------------------------------------------------------------------
+    # Rule 1: A/B Testing / Beta Testers (Header-Based Routing)
+    # --------------------------------------------------------------------------
+    - name: "beta-testers-route"
+      match:
+        - headers:
+            # Route requests containing 'end-user: jason' to beta version v3
+            end-user:
+              exact: jason
+      route:
+        - destination:
+            host: reviews
+            subset: v3 # Subsets are defined in the matching DestinationRule
+
+    # --------------------------------------------------------------------------
+    # Rule 2: Resilience Testing (Fault Injection - Delays & Aborts)
+    # --------------------------------------------------------------------------
+    - name: "chaos-testing-route"
+      match:
+        - headers:
+            x-chaos-test:
+              exact: "true"
+      # Inject 3-second delay on 50% of matching requests to test client timeouts
+      fault:
+        delay:
+          percentage:
+            value: 50.0
+          fixedDelay: 3s
+        # Optionally abort 10% of requests with HTTP 503 Service Unavailable:
+        # abort:
+        #   percentage:
+        #     value: 10.0
+        #   httpStatus: 503
+      route:
+        - destination:
+            host: reviews
+            subset: v1
+
+    # --------------------------------------------------------------------------
+    # Rule 3: Canary Release (Weighted Traffic Splitting) with Retries & Timeouts
+    # --------------------------------------------------------------------------
+    - name: "canary-weighted-route"
+      # Global request timeout (fails if backend takes longer than 2s)
+      timeout: 2s
+
+      # Automatic retries for transient failures
+      retries:
+        attempts: 3
+        perTryTimeout: 500ms
+        retryOn: "5xx,connect-failure,refused-stream"
+
+      # Split traffic between stable v1 (80%) and new v2 (20%)
+      route:
+        - destination:
+            host: reviews
+            subset: v1
+          weight: 80
+        - destination:
+            host: reviews
+            subset: v2
+          weight: 20
+

@@ -1,0 +1,75 @@
+# ==============================================================================
+# Kubernetes Object: Service (ClusterIP)
+# ==============================================================================
+# WHAT IS A SERVICE?
+# A Kubernetes Service is an abstraction that defines a logical set of Pods and 
+# a policy by which to access them.
+#
+# WHY DO WE NEED SERVICES?
+# - Pods are ephemeral: They are created and destroyed dynamically, and their IP
+#   addresses change every time.
+# - A Service provides a STABLE virtual IP (VIP) and DNS name that never changes,
+#   automatically load-balancing traffic across all healthy matching Pods.
+#
+# WHAT IS CLUSTERIP?
+# - Default service type.
+# - Exposes the Service on an internal IP in the cluster.
+# - Accessible ONLY from within the cluster (pod-to-pod or node-to-pod).
+#
+# HOW POD DISCOVERY WORKS:
+# - Service uses `spec.selector` to find Pods with matching labels.
+# - The Endpoints controller automatically builds an `Endpoints` (or `EndpointSlice`)
+#   object listing the active IPs of healthy pods whose readiness probes have passed!
+#
+# DNS ADDRESS:
+# <service-name>.<namespace>.svc.cluster.local
+# Inside the same namespace: 'backend-service:80'
+#
+# IMPORTANT CLI COMMANDS:
+# - Apply:        kubectl apply -f clusterip-service.yaml
+# - Get Services: kubectl get svc
+# - Endpoints:    kubectl get endpoints backend-service (or kubectl get endpointslice)
+# - Test DNS:     kubectl run test-dns --rm -it --image=busybox:1.36 -- nslookup backend-service
+# ==============================================================================
+
+apiVersion: v1
+kind: Service
+
+metadata:
+  name: backend-service
+  namespace: default
+  labels:
+    app: backend-api
+    tier: api
+
+spec:
+  # Type ClusterIP is default (can be omitted)
+  type: ClusterIP
+
+  # ----------------------------------------------------------------------------
+  # Label Selector: Connects this Service to Pods labeled 'app: backend-api'
+  # ----------------------------------------------------------------------------
+  selector:
+    app: backend-api
+    tier: api
+
+  # ----------------------------------------------------------------------------
+  # Ports Definition
+  # ----------------------------------------------------------------------------
+  ports:
+    - name: http-traffic
+      # The port this Service listens on internally inside the cluster
+      port: 80
+      # The port exposed on the target container inside the Pod
+      targetPort: 8080
+      protocol: TCP
+
+    - name: metrics-traffic
+      port: 9090
+      targetPort: 9090
+      protocol: TCP
+
+  # Session Affinity: 'ClientIP' routes requests from the same client to the same Pod
+  # Default is 'None' (random round-robin load balancing)
+  sessionAffinity: None
+

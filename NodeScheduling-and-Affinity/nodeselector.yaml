@@ -1,0 +1,53 @@
+# ==============================================================================
+# Kubernetes Scheduling: nodeSelector
+# ==============================================================================
+# WHAT IS NODESELECTOR?
+# `nodeSelector` is the simplest recommended form of node selection constraint.
+# It matches key-value label pairs on worker nodes.
+#
+# HOW IT WORKS:
+# 1. Cluster admin labels nodes:
+#    kubectl label nodes worker-node-1 disktype=ssd
+# 2. Pod defines nodeSelector:
+#    disktype: ssd
+# 3. Kube-scheduler only places this Pod on nodes having that exact label.
+#
+# LIMITATION:
+# Only supports exact equality matching (no boolean OR, no regex, no soft preferences).
+# For advanced logic, use Node Affinity instead.
+#
+# IMPORTANT CLI COMMANDS:
+# - Label Node:   kubectl label nodes <node-name> disktype=ssd
+# - Check Labels: kubectl get nodes --show-labels
+# - Apply Pod:    kubectl apply -f nodeselector.yaml
+# ==============================================================================
+
+apiVersion: v1
+kind: Pod
+
+metadata:
+  name: ssd-workload-pod
+  namespace: default
+  labels:
+    app: fast-indexer
+
+spec:
+  # ----------------------------------------------------------------------------
+  # nodeSelector: Only schedule on nodes with this exact label
+  # ----------------------------------------------------------------------------
+  nodeSelector:
+    disktype: ssd
+    kubernetes.io/os: linux
+
+  containers:
+    - name: data-indexer
+      image: busybox:1.36
+      command: ["/bin/sh", "-c", "echo 'Running on SSD node'; sleep 3600"]
+      resources:
+        requests:
+          cpu: "100m"
+          memory: "128Mi"
+        limits:
+          cpu: "250m"
+          memory: "256Mi"
+

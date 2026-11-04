@@ -1,0 +1,72 @@
+# ==============================================================================
+# Gateway API Object: GatewayClass
+# ==============================================================================
+# WHAT IS THE GATEWAY API?
+# The Gateway API is the successor to the traditional Ingress resource. It is an
+# official Kubernetes project that provides a more expressive, extensible, and
+# role-oriented API for modeling service networking.
+#
+# GATEWAY API vs INGRESS:
+# - Ingress is limited to basic HTTP host/path routing with vendor-specific annotations.
+# - Gateway API introduces typed resources (GatewayClass, Gateway, HTTPRoute, etc.)
+#   with first-class support for TCP, UDP, TLS, gRPC, header-based routing, traffic
+#   splitting, request mirroring, and cross-namespace references.
+#
+# ROLE-ORIENTED DESIGN (Who manages what?):
+# ┌─────────────────────────────────────────────────────────────────────────┐
+# │  Platform Admin  →  Defines GatewayClass (which controller to use)     │
+# │  Cluster Operator →  Creates Gateway (provisions listeners/ports/TLS)  │
+# │  App Developer   →  Attaches HTTPRoute/TCPRoute to the Gateway         │
+# └─────────────────────────────────────────────────────────────────────────┘
+#
+# WHAT IS A GATEWAYCLASS?
+# A GatewayClass defines a set of Gateways that share a common controller
+# (implementation). It is similar to how StorageClass defines a storage provisioner
+# and IngressClass defines an Ingress controller.
+#
+# GatewayClass is a CLUSTER-SCOPED resource (no namespace field).
+#
+# IMPORTANT CLI COMMANDS:
+# - Apply:        kubectl apply -f gatewayclass.yaml
+# - Get:          kubectl get gatewayclass (or gc)
+# - Describe:     kubectl describe gatewayclass production-gateway-class
+#
+# PREREQUISITE:
+# Install a Gateway API CRD bundle and a supporting controller first:
+#   kubectl apply -f https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.2.0/standard-install.yaml
+# ==============================================================================
+
+apiVersion: gateway.networking.k8s.io/v1
+kind: GatewayClass
+
+metadata:
+  # Cluster-scoped: no namespace required
+  name: production-gateway-class
+  labels:
+    tier: networking
+    managed-by: platform-admin
+
+spec:
+  # controllerName is the domain-prefixed identifier of the controller that
+  # manages Gateways of this class. Each implementation uses its own name:
+  #
+  # Controller Examples:
+  # - Istio:                 istio.io/gateway-controller
+  # - Envoy Gateway:         gateway.envoyproxy.io/gatewayclass-controller
+  # - NGINX Gateway Fabric:  gateway.nginx.org/nginx-gateway-controller
+  # - Cilium:                io.cilium/gateway-controller
+  # - Traefik:               traefik.io/gateway-controller
+  # - HAProxy:               haproxy.org/gateway-controller
+  # - Kong:                  konghq.com/kic-gateway-controller
+  controllerName: gateway.envoyproxy.io/gatewayclass-controller
+
+  # Optional description for documentation
+  description: "Production-grade GatewayClass powered by Envoy Gateway"
+
+  # parametersRef points to a custom resource for controller-specific configuration
+  # (Optional; controller-dependent)
+  # parametersRef:
+  #   group: gateway.envoyproxy.io
+  #   kind: EnvoyProxy
+  #   name: custom-envoy-config
+

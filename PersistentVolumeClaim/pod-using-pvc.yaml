@@ -1,0 +1,59 @@
+# ==============================================================================
+# Kubernetes Manifest: Pod Using PersistentVolumeClaim
+# ==============================================================================
+# Shows how a Pod mounts and uses a PersistentVolumeClaim to persist data across
+# pod restarts, crashes, and reschedule events.
+#
+# IMPORTANT CLI COMMANDS:
+# - Apply:        kubectl apply -f pod-using-pvc.yaml
+# - Write file:   kubectl exec -it pvc-consumer-pod -- /bin/sh -c "echo 'Persisted Data' > /data/file.txt"
+# - Delete Pod:   kubectl delete pod pvc-consumer-pod
+# - Re-apply Pod: kubectl apply -f pod-using-pvc.yaml
+# - Verify file:  kubectl exec -it pvc-consumer-pod -- cat /data/file.txt (Data is still there!)
+# ==============================================================================
+
+apiVersion: v1
+kind: Pod
+
+metadata:
+  name: pvc-consumer-pod
+  namespace: default
+  labels:
+    app: persistent-worker
+
+spec:
+  # ----------------------------------------------------------------------------
+  # Volumes section referencing the PVC
+  # ----------------------------------------------------------------------------
+  volumes:
+    - name: storage-volume
+      persistentVolumeClaim:
+        claimName: app-data-pvc
+
+  containers:
+    - name: file-writer
+      image: busybox:1.36
+      command: ["/bin/sh", "-c"]
+      args:
+        - >
+          echo "Pod started at $(date)" >> /data/access.log;
+          echo "Viewing persistent history:";
+          cat /data/access.log;
+          while true; do
+            echo "$(date): Health check ping" >> /data/access.log;
+            sleep 10;
+          done
+
+      # Mount the PVC storage at /data
+      volumeMounts:
+        - name: storage-volume
+          mountPath: /data
+
+      resources:
+        requests:
+          cpu: "50m"
+          memory: "64Mi"
+        limits:
+          cpu: "100m"
+          memory: "128Mi"
+

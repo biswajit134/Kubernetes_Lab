@@ -1,0 +1,62 @@
+# ==============================================================================
+# Service Mesh Object: PeerAuthentication (Istio Security CRD)
+# ==============================================================================
+# WHAT IS PEERAUTHENTICATION?
+# PeerAuthentication defines how traffic between workloads is authenticated.
+# Specifically, it governs mutual TLS (mTLS) enforcement.
+#
+# THREE mTLS MODES:
+# 1. PERMISSIVE: Workload accepts both cleartext (HTTP) and encrypted (mTLS) traffic.
+#    - Ideal for migrating services into the mesh gradually without breaking non-mesh pods.
+#
+# 2. STRICT: Workload ONLY accepts encrypted mTLS traffic.
+#    - All plain HTTP connections are rejected immediately.
+#    - Required for Zero Trust security compliance (SOC2, PCI-DSS, HIPAA).
+#
+# 3. DISABLE: mTLS is completely disabled. Traffic is sent unencrypted.
+#
+# SCOPING LEVELS:
+# - Mesh-Wide: Deployed in the root namespace (`istio-system`) with no selector.
+# - Namespace-Wide: Deployed in a specific namespace with no selector.
+# - Workload-Specific: Deployed in a namespace with a `selector` matching Pod labels.
+#
+# IMPORTANT CLI COMMANDS:
+# - Apply:        kubectl apply -f peerauthentication.yaml
+# - Get:          kubectl get peerauthentication (or pa) -n default
+# - Verify mTLS:  istioctl authn tls-check <pod-name> reviews.default.svc.cluster.local
+# ==============================================================================
+
+apiVersion: security.istio.io/v1beta1
+kind: PeerAuthentication
+
+metadata:
+  name: default-strict-mtls
+  namespace: default
+  labels:
+    tier: security-compliance
+
+spec:
+  # ----------------------------------------------------------------------------
+  # Workload Selector (Optional):
+  # If omitted, this policy applies to ALL workloads in the namespace!
+  # ----------------------------------------------------------------------------
+  selector:
+    matchLabels:
+      app: reviews
+
+  # ----------------------------------------------------------------------------
+  # Mutual TLS Mode
+  # ----------------------------------------------------------------------------
+  mtls:
+    # Enforce STRICT mTLS: Any unencrypted connection will be dropped
+    mode: STRICT
+
+  # ----------------------------------------------------------------------------
+  # Port-Level Overrides (Optional):
+  # Allows overriding the mTLS mode on specific ports (e.g. for metrics scraping)
+  # ----------------------------------------------------------------------------
+  portLevelMtls:
+    9090:
+      # Allow Prometheus to scrape metrics via cleartext HTTP on port 9090
+      mode: PERMISSIVE
+

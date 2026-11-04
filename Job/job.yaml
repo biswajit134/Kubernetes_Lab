@@ -1,0 +1,89 @@
+# ==============================================================================
+# Kubernetes Object: Job
+# ==============================================================================
+# WHAT IS A JOB?
+# A Job creates one or more Pods and will continue to retry execution of the Pods 
+# until a specified number of them successfully terminate (exit code 0).
+#
+# WHEN TO USE A JOB (VS DEPLOYMENT):
+# - Deployments are for CONTINUOUS services (web servers, APIs) that should never stop.
+# - Jobs are for RUN-TO-COMPLETION tasks (data backups, database migrations, 
+#   batch calculations, report generation).
+#
+# KEY PATTERNS:
+# 1. Non-parallel Job: Runs a single pod until it succeeds.
+# 2. Parallel Job with fixed completion count: (e.g. completions: 5, parallelism: 2).
+# 3. Parallel Job with work queue: Pods coordinate via a queue; completes when 
+#    one pod finishes and all others are done.
+#
+# IMPORTANT CLI COMMANDS:
+# - Apply:        kubectl apply -f job.yaml
+# - Get Jobs:     kubectl get jobs
+# - Describe:     kubectl describe job data-migration-job
+# - Watch Pods:   kubectl get pods -l job-name=data-migration-job
+# - Delete:       kubectl delete job data-migration-job
+# ==============================================================================
+
+apiVersion: batch/v1
+kind: Job
+
+metadata:
+  name: data-processing-job
+  namespace: default
+  labels:
+    app: batch-processor
+    tier: data
+
+spec:
+  # ----------------------------------------------------------------------------
+  # Job Execution Controls
+  # ----------------------------------------------------------------------------
+  # Total number of successful pod completions required to consider the Job finished
+  completions: 3
+
+  # Maximum number of pods that can run simultaneously
+  # (Here: 2 pods run in parallel until 3 total succeed)
+  parallelism: 2
+
+  # Maximum retry attempts before marking the Job as failed (Default: 6)
+  backoffLimit: 4
+
+  # Hard ceiling in seconds: If the job runs longer than this, it is terminated
+  activeDeadlineSeconds: 600
+
+  # Automatic cleanup: Deletes finished job and pods 100 seconds after completion (Kubernetes 1.23+)
+  ttlSecondsAfterFinished: 100
+
+  # ----------------------------------------------------------------------------
+  # Pod Template
+  # ----------------------------------------------------------------------------
+  template:
+    metadata:
+      labels:
+        app: batch-processor
+    spec:
+      # CRITICAL: restartPolicy for a Job must be 'Never' or 'OnFailure' (NOT 'Always')
+      # - OnFailure: Container restarts in place on failure without creating a new Pod.
+      # - Never: Pod is marked failed and a completely new Pod is scheduled.
+      restartPolicy: OnFailure
+
+      containers:
+        - name: data-worker
+          image: busybox:1.36
+          command: ["/bin/sh", "-c"]
+          args:
+            - >
+              echo "Batch processing started at $(date)...";
+              sleep 5;
+              echo "Batch task step 1: Validating schema... Done.";
+              echo "Batch task step 2: Computing aggregates... Done.";
+              echo "Job completed successfully!";
+              exit 0;
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "64Mi"
+            limits:
+              cpu: "250m"
+              memory: "128Mi"
+

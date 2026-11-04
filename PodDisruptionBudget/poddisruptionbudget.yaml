@@ -1,0 +1,55 @@
+# ==============================================================================
+# Kubernetes Object: PodDisruptionBudget (PDB)
+# ==============================================================================
+# WHAT IS A PODDISRUPTIONBUDGET?
+# A PodDisruptionBudget (PDB) limits the number of Pods of a replicated application 
+# that are down simultaneously from VOLUNTARY disruptions.
+#
+# INVOLUNTARY VS VOLUNTARY DISRUPTIONS:
+# - Involuntary (Uncontrollable): Hardware failure, kernel panic, network partition, node VM crash.
+# - Voluntary (Controllable): Node drains (kubectl drain node-1), cluster upgrades,
+#   autoscaling node consolidation/downscaling, cluster admin maintenance.
+#
+# HOW IT PROTECTS PRODUCTION:
+# When an admin runs `kubectl drain <node>`, the API server checks matching PDBs.
+# If evicting a pod would violate the PDB (e.g. minAvailable 80%), the eviction 
+# is REJECTED or DELAYED until replacement pods are running on other nodes!
+#
+# SPECIFICATION MODES (Mutually Exclusive):
+# - minAvailable: Minimum number (or %) of pods that MUST remain available.
+# - maxUnavailable: Maximum number (or %) of pods that CAN be evicted simultaneously.
+#
+# IMPORTANT CLI COMMANDS:
+# - Apply:        kubectl apply -f poddisruptionbudget.yaml
+# - Get PDB:      kubectl get pdb
+# - Describe:     kubectl describe pdb web-app-pdb
+# ==============================================================================
+
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+
+metadata:
+  name: web-app-pdb
+  namespace: default
+  labels:
+    app: web-store
+    tier: high-availability
+
+spec:
+  # ----------------------------------------------------------------------------
+  # Availability Budget: (Specify either minAvailable OR maxUnavailable, not both)
+  # ----------------------------------------------------------------------------
+  # Option A: At least 2 pods (or 75%) must ALWAYS be available and healthy:
+  minAvailable: 2
+
+  # Option B (Alternative): At most 1 pod can be unavailable during voluntary disruption:
+  # maxUnavailable: 1
+
+  # ----------------------------------------------------------------------------
+  # Selector: Identifies which pods are protected by this budget
+  # ----------------------------------------------------------------------------
+  selector:
+    matchLabels:
+      app: web-store
+      tier: frontend
+

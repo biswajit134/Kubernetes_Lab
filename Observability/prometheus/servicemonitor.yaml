@@ -1,0 +1,85 @@
+# ==============================================================================
+# Observability Object: ServiceMonitor (Prometheus Operator CRD)
+# ==============================================================================
+# WHAT IS A SERVICEMONITOR?
+# In traditional Prometheus, you had to manually edit a massive `prometheus.yml` 
+# configuration file and restart Prometheus whenever a new service was added.
+#
+# The Prometheus Operator introduces the `ServiceMonitor` Custom Resource:
+# - It declaratively specifies how a set of Kubernetes Services should be monitored.
+# - Prometheus Operator automatically discovers `ServiceMonitor` objects and dynamically
+#   reconfigures Prometheus scrape targets with zero downtime!
+#
+# HOW DISCOVERY WORKS:
+# 1. Prometheus checks its `serviceMonitorSelector` to find matching ServiceMonitors.
+# 2. ServiceMonitor checks its `spec.selector` to find target Kubernetes Services.
+# 3. ServiceMonitor checks `spec.endpoints` to scrape metrics from the named ports.
+#
+# IMPORTANT CLI COMMANDS:
+# - Apply:             kubectl apply -f servicemonitor.yaml
+# - Get:               kubectl get servicemonitors (or sm) -A
+# - Describe:          kubectl describe sm backend-api-monitor
+# - Check Targets:     Port-forward Prometheus and visit http://localhost:9090/targets
+# ==============================================================================
+
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+
+metadata:
+  name: backend-api-monitor
+  namespace: default
+  labels:
+    # This label is critical: The Prometheus custom resource defines a
+    # 'serviceMonitorSelector' that looks for specific labels (e.g., release: prometheus)
+    release: prometheus-stack
+    tier: monitoring
+
+spec:
+  # ----------------------------------------------------------------------------
+  # Selector: Selects the Kubernetes Services to scrape
+  # ----------------------------------------------------------------------------
+  selector:
+    matchLabels:
+      app: backend-api
+
+  # ----------------------------------------------------------------------------
+  # NamespaceSelector: Where to search for matching Services
+  # ----------------------------------------------------------------------------
+  namespaceSelector:
+    # Match specific namespaces, or use 'any: true' to search all namespaces
+    matchNames:
+      - default
+      - staging
+
+  # ----------------------------------------------------------------------------
+  # Endpoints: Port, path, interval, and relabeling rules
+  # ----------------------------------------------------------------------------
+  endpoints:
+    - # The port NAME on the target Kubernetes Service (e.g. 'metrics-traffic')
+      port: metrics-traffic
+
+      # HTTP path exposing metrics (default is /metrics)
+      path: /metrics
+
+      # Scrape frequency
+      interval: 15s
+
+      # Timeout for scrape requests (must be <= interval)
+      scrapeTimeout: 10s
+
+      # Scheme can be HTTP or HTTPS
+      scheme: http
+
+      # ------------------------------------------------------------------------
+      # Metric Relabeling: Filter or modify metrics BEFORE they enter Prometheus
+      # ------------------------------------------------------------------------
+      metricRelabelings:
+        # Drop high-cardinality or unneeded debug metrics
+        - sourceLabels: [__name__]
+          regex: "go_memstats_.*"
+          action: drop
+
+        # Add custom cluster identifier tag
+        - targetLabel: cluster_environment
+          replacement: "production-us-east-1"
+

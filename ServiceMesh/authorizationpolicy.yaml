@@ -1,0 +1,79 @@
+# ==============================================================================
+# Service Mesh Object: AuthorizationPolicy (Istio Security CRD)
+# ==============================================================================
+# WHAT IS AN AUTHORIZATIONPOLICY?
+# AuthorizationPolicy enables Layer 7 access control (Zero Trust) for workloads 
+# in the mesh. While NetworkPolicy operates at Layer 3/4 (IP and Port), 
+# AuthorizationPolicy operates at Layer 7 (HTTP methods, paths, JWT claims, 
+# cryptographic service account identities).
+#
+# HOW IT WORKS:
+# 1. When a client calls a service, the Envoy proxy intercepts the request.
+# 2. It inspects the client's mTLS SPIFFE ID (`spiffe://cluster.local/ns/default/sa/frontend-sa`),
+#    JWT tokens, HTTP method, and path.
+# 3. If the request matches the AuthorizationPolicy rules, it is ALLOWED.
+#    Otherwise, Envoy returns an HTTP 403 Forbidden.
+#
+# POLICY ACTIONS:
+# - ALLOW (Default): Whitelists requests matching the rules.
+# - DENY: Blacklists matching requests (evaluated before ALLOW rules).
+# - AUDIT: Logs matching requests without blocking them.
+# - CUSTOM: Delegates authorization to an external auth server (OAuth/OIDC/Opa).
+#
+# IMPORTANT CLI COMMANDS:
+# - Apply:        kubectl apply -f authorizationpolicy.yaml
+# - Get:          kubectl get authorizationpolicy (or authz)
+# - Describe:     kubectl describe authz secure-reviews-policy
+# ==============================================================================
+
+apiVersion: security.istio.io/v1beta1
+kind: AuthorizationPolicy
+
+metadata:
+  name: secure-reviews-policy
+  namespace: default
+  labels:
+    tier: zero-trust-security
+
+spec:
+  # ----------------------------------------------------------------------------
+  # Workload Selector: Workloads protected by this policy
+  # ----------------------------------------------------------------------------
+  selector:
+    matchLabels:
+      app: reviews
+
+  # Action: ALLOW, DENY, AUDIT, or CUSTOM
+  action: ALLOW
+
+  # ----------------------------------------------------------------------------
+  # Rules: The request is allowed if ANY of the rules evaluate to true
+  # ----------------------------------------------------------------------------
+  rules:
+    # --------------------------------------------------------------------------
+    # Rule 1: Allow GET requests from frontend service account
+    # --------------------------------------------------------------------------
+    - from:
+        - source:
+            # Cryptographic identity verified via mTLS certificate (SPIFFE ID)
+            principals: ["cluster.local/ns/default/sa/frontend-service-account"]
+      to:
+        - operation:
+            methods: ["GET"]
+            paths: ["/reviews/*", "/healthz"]
+
+    # --------------------------------------------------------------------------
+    # Rule 2: Allow authenticated admins with valid JWT token claims
+    # --------------------------------------------------------------------------
+    - from:
+        - source:
+            # Request must have a validated JWT token issued by auth0
+            requestPrincipals: ["https://auth.mycompany.com/*"]
+      to:
+        - operation:
+            methods: ["POST", "PUT", "DELETE"]
+            paths: ["/reviews/*"]
+      when:
+        - key: request.auth.claims[role]
+          values: ["admin", "editor"]
+

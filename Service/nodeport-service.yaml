@@ -1,0 +1,48 @@
+# ==============================================================================
+# Kubernetes Object: Service (NodePort)
+# ==============================================================================
+# WHAT IS A NODEPORT SERVICE?
+# A NodePort service exposes the Service on each Node's IP at a static port 
+# (by default in range 30000-32767).
+#
+# HOW TRAFFIC FLOWS:
+# Client Request -> <Any Node IP>:<NodePort> -> Service ClusterIP -> Target Pod
+#
+# CHARACTERISTICS:
+# - Builds ON TOP of ClusterIP (automatically allocates a ClusterIP too).
+# - Allows external clients to reach pods by contacting any cluster node's IP:NodePort.
+# - Can specify a specific nodePort or let Kubernetes automatically pick one from 30000-32767.
+#
+# IMPORTANT CLI COMMANDS:
+# - Apply:        kubectl apply -f nodeport-service.yaml
+# - Get:          kubectl get svc web-nodeport-service
+# - Access:       curl http://<NODE_IP>:30080
+# ==============================================================================
+
+apiVersion: v1
+kind: Service
+
+metadata:
+  name: web-nodeport-service
+  namespace: default
+  labels:
+    app: web-frontend
+
+spec:
+  type: NodePort
+
+  # External Traffic Policy:
+  # - Cluster (Default): May route traffic across nodes to reach pod (incurs network hop, masks source IP).
+  # - Local: Preserves client source IP, routes only to local pods on that node. Drops if no local pod!
+  externalTrafficPolicy: Cluster
+
+  selector:
+    app: web-frontend
+
+  ports:
+    - name: http
+      port: 80              # Port inside the cluster VIP
+      targetPort: 80        # Port on the container
+      nodePort: 30080       # Port on every worker node (30000-32767)
+      protocol: TCP
+

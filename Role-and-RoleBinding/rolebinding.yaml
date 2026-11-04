@@ -1,0 +1,54 @@
+# ==============================================================================
+# Kubernetes Object: RoleBinding (RBAC)
+# ==============================================================================
+# WHAT IS A ROLEBINDING?
+# A RoleBinding grants the permissions defined in a Role to a list of subjects 
+# (Users, Groups, or ServiceAccounts) within a specific namespace.
+#
+# SUBJECTS:
+# - User: A named human user (e.g., "alice@company.com").
+# - Group: A group of users (e.g., "developers", "system:authenticated").
+# - ServiceAccount: An in-cluster workload identity (e.g., "app-service-account").
+#
+# IMPORTANT CLI COMMANDS:
+# - Apply:            kubectl apply -f rolebinding.yaml
+# - Get RoleBindings: kubectl get rolebindings -n default
+# - Test Auth:        kubectl auth can-i get pods --as=system:serviceaccount:default:app-service-account -n default
+# ==============================================================================
+
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+
+metadata:
+  name: read-pods-binding
+  namespace: default
+  labels:
+    tier: rbac-security
+
+# ------------------------------------------------------------------------------
+# Subjects: Who receives the permissions?
+# ------------------------------------------------------------------------------
+subjects:
+  # Subject 1: A specific ServiceAccount running in this namespace
+  - kind: ServiceAccount
+    name: app-service-account
+    namespace: default
+
+  # Subject 2: A specific human user
+  - kind: User
+    name: developer-bob
+    apiGroup: rbac.authorization.k8s.io
+
+  # Subject 3: An entire group of developers
+  - kind: Group
+    name: "developers-team"
+    apiGroup: rbac.authorization.k8s.io
+
+# ------------------------------------------------------------------------------
+# RoleRef: The Role being granted (cannot be changed after creation)
+# ------------------------------------------------------------------------------
+roleRef:
+  kind: Role
+  name: pod-reader-role
+  apiGroup: rbac.authorization.k8s.io
+

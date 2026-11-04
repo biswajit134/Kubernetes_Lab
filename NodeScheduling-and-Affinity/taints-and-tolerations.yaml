@@ -1,0 +1,71 @@
+# ==============================================================================
+# Kubernetes Scheduling: Taints and Tolerations
+# ==============================================================================
+# WHAT ARE TAINTS AND TOLERATIONS?
+# Node affinity ATTACTS pods to certain nodes.
+# Taints do the opposite: A Taint allows a node to REPEL a set of pods!
+#
+# HOW IT WORKS:
+# 1. Admin applies a TAINT to a Node:
+#    kubectl taint nodes worker-gpu dedicated=gpu:NoSchedule
+# 2. Regular pods CANNOT schedule onto this node.
+# 3. Only pods with a matching TOLERATION are permitted (tolerated) to run on that node.
+#
+# THREE TAINT EFFECTS:
+# 1. NoSchedule: Pod will not be scheduled unless it has a matching toleration.
+#    Existing running pods on the node are NOT evicted.
+# 2. PreferNoSchedule: Soft version: Scheduler will try to avoid scheduling, 
+#    but will place the pod if no other node is available.
+# 3. NoExecute: Pod will not schedule, AND existing pods on the node that lack 
+#    toleration are IMMEDIATELY EVICTED!
+#
+# IMPORTANT CLI COMMANDS:
+# - Add Taint:    kubectl taint nodes node1 dedicated=ml-workload:NoSchedule
+# - Remove Taint: kubectl taint nodes node1 dedicated=ml-workload:NoSchedule-
+# - Apply Pod:    kubectl apply -f taints-and-tolerations.yaml
+# ==============================================================================
+
+apiVersion: v1
+kind: Pod
+
+metadata:
+  name: ml-training-pod
+  namespace: default
+  labels:
+    app: gpu-trainer
+
+spec:
+  # ----------------------------------------------------------------------------
+  # Tolerations: Allow this Pod to be scheduled on tainted nodes
+  # ----------------------------------------------------------------------------
+  tolerations:
+    # Toleration 1: Matches key, value, and effect (Equal operator)
+    - key: "dedicated"
+      operator: "Equal"
+      value: "ml-workload"
+      effect: "NoSchedule"
+
+    # Toleration 2: Matches any value with key 'gpu' (Exists operator)
+    - key: "gpu"
+      operator: "Exists"
+      effect: "NoSchedule"
+
+    # Toleration 3: Grace period toleration for NoExecute taints
+    # If node becomes unreachable or not-ready, stay running for 300 seconds before being evicted
+    - key: "node.kubernetes.io/not-ready"
+      operator: "Exists"
+      effect: "NoExecute"
+      tolerationSeconds: 300
+
+  containers:
+    - name: trainer
+      image: busybox:1.36
+      command: ["/bin/sh", "-c", "echo 'Training model on dedicated node...'; sleep 3600"]
+      resources:
+        requests:
+          cpu: "500m"
+          memory: "512Mi"
+        limits:
+          cpu: "1"
+          memory: "1Gi"
+

@@ -1,0 +1,49 @@
+# ==============================================================================
+# Gateway API Object: TCPRoute
+# ==============================================================================
+# WHAT IS A TCPROUTE?
+# A TCPRoute provides Layer 4 (L4) TCP routing for non-HTTP workloads such as
+# databases (PostgreSQL, MySQL, MongoDB), message brokers (Kafka, RabbitMQ),
+# and custom TCP-based protocols.
+#
+# KEY DIFFERENCE FROM HTTPROUTE:
+# - HTTPRoute operates at Layer 7 (HTTP) and can inspect headers, paths, methods.
+# - TCPRoute operates at Layer 4 (TCP) and only knows about IP addresses and ports.
+#   There is NO path matching, header matching, or traffic splitting.
+#
+# IMPORTANT CLI COMMANDS:
+# - Apply:        kubectl apply -f tcproute.yaml
+# - Get:          kubectl get tcproute
+# - Describe:     kubectl describe tcproute database-tcp-route
+#
+# NOTE: TCPRoute is part of the "experimental" channel as of Gateway API v1.2.
+# Install the experimental CRDs:
+#   kubectl apply -f https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.2.0/experimental-install.yaml
+# ==============================================================================
+
+apiVersion: gateway.networking.k8s.io/v1alpha2
+kind: TCPRoute
+
+metadata:
+  name: database-tcp-route
+  namespace: default
+  labels:
+    app: database-proxy
+    protocol: tcp
+
+spec:
+  # Attach to the Gateway's TCP listener on port 5432
+  parentRefs:
+    - name: main-gateway
+      sectionName: tcp-database-listener
+
+  # ----------------------------------------------------------------------------
+  # Rules: Layer 4 TCP forwarding (no path/header matching available)
+  # ----------------------------------------------------------------------------
+  rules:
+    # Forward all TCP traffic arriving on port 5432 to the Postgres Service
+    - backendRefs:
+        - name: postgres-primary-service
+          port: 5432
+          weight: 100
+

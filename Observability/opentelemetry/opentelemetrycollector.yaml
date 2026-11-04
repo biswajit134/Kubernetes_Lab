@@ -1,0 +1,140 @@
+# ==============================================================================
+# Observability Object: OpenTelemetryCollector (OpenTelemetry Operator CRD)
+# ==============================================================================
+# WHAT IS OPENTELEMETRY (OTel)?
+# OpenTelemetry is the vendor-neutral industry standard framework for collecting,
+# processing, and exporting telemetry data (Metrics, Logs, and Traces).
+#
+# WHAT IS THE OPENTELEMETRY COLLECTOR?
+# A proxy service that receives telemetry from client libraries, runs it through
+# processing pipelines (filtering, scrubbing, batching, enriching with Kubernetes
+# metadata), and exports it to backends (Prometheus, Jaeger, Loki, Datadog, Honeycomb).
+#
+# THREE DEPLOYMENT MODES:
+# - `deployment`: Centralized cluster-wide collector (default).
+# - `daemonset`: Per-node agent (ideal for node log collection and host metrics).
+# - `sidecar`: Injected as a sidecar alongside application containers.
+#
+# THE OTel PIPELINE ARCHITECTURE:
+# Receivers ──▶ Processors ──▶ Exporters
+#  (inbound)       (enrich/batch)    (outbound backends)
+#
+# IMPORTANT CLI COMMANDS:
+# - Apply:        kubectl apply -f opentelemetrycollector.yaml
+# - Get:          kubectl get opentelemetrycollectors (or otelcol)
+# - View Logs:    kubectl logs -l app.kubernetes.io/name=otel-collector -f
+# ==============================================================================
+
+apiVersion: opentelemetry.io/v1beta1
+kind: OpenTelemetryCollector
+
+metadata:
+  name: otel-collector
+  namespace: default
+  labels:
+    tier: observability
+    app: otel-collector
+
+spec:
+  # Mode options: deployment (default), daemonset, sidecar, statefulset
+  mode: deployment
+
+  replicas: 2
+
+  resources:
+    requests:
+      cpu: 200m
+      memory: 256Mi
+    limits:
+      cpu: 1000m
+      memory: 1Gi
+
+  # ----------------------------------------------------------------------------
+  # OpenTelemetry Pipeline Configuration
+  # ----------------------------------------------------------------------------
+  config:
+    # --------------------------------------------------------------------------
+    # 1. RECEIVERS: Ingest data into the collector
+    # --------------------------------------------------------------------------
+    receivers:
+      # OTLP (OpenTelemetry Protocol) over gRPC and HTTP
+      otlp:
+        protocols:
+          grpc:
+            endpoint: 0.0.0.0:4317
+          http:
+            endpoint: 0.0.0.0:4318
+
+      # Scrape Prometheus metrics directly
+      prometheus:
+        config:
+          scrape_configs:
+            - job_name: "otel-collector-internal"
+              scrape_interval: 15s
+              static_configs:
+                - targets: ["0.0.0.0:8888"]
+
+    # --------------------------------------------------------------------------
+    # 2. PROCESSORS: Transform, filter, and enrich telemetry data
+    # --------------------------------------------------------------------------
+    processors:
+      # Memory Limiter: Drops or throttles data if collector memory spikes
+      memory_limiter:
+        check_interval: 1s
+        limit_percentage: 75
+        spike_limit_percentage: 20
+
+      # Batch Processor: Groups telemetry items into batches to optimize network calls
+      batch:
+        send_batch_size: 8192
+        timeout: 1s
+
+      # Kubernetes Attributes Processor: Automatically adds pod name, namespace,
+      # node name, and container labels to incoming spans and metrics
+      k8sattributes:
+        auth_type: "serviceAccount"
+        passthrough: false
+        extract:
+          metadata:
+            - k8s.pod.name
+            - k8s.pod.uid
+            - k8s.namespace.name
+            - k8s.node.name
+            - k8s.deployment.name
+
+    # --------------------------------------------------------------------------
+    # 3. EXPORTERS: Send processed data to external backends
+    # --------------------------------------------------------------------------
+    exporters:
+      # Export traces to Jaeger
+      otlp/jaeger:
+        endpoint: "jaeger-collector.default.svc.cluster.local:4317"
+        tls:
+          insecure: true
+
+      # Expose metrics for Prometheus to scrape
+      prometheus:
+        endpoint: "0.0.0.0:8889"
+        namespace: "otel"
+
+      # Print to stdout for debugging
+      debug:
+        verbosity: basic
+
+    # --------------------------------------------------------------------------
+    # 4. SERVICE PIPELINES: Connect Receivers -> Processors -> Exporters
+    # --------------------------------------------------------------------------
+    service:
+      pipelines:
+        # Traces Pipeline
+        traces:
+          receivers: [otlp]
+          processors: [memory_limiter, k8sattributes, batch]
+          exporters: [otlp/jaeger, debug]
+
+        # Metrics Pipeline
+        metrics:
+          receivers: [otlp, prometheus]
+          processors: [memory_limiter, k8sattributes, batch]
+          exporters: [prometheus]
+

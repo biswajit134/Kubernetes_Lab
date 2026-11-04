@@ -1,0 +1,88 @@
+# ==============================================================================
+# Kubernetes Scheduling: Node Affinity
+# ==============================================================================
+# WHAT IS NODE AFFINITY?
+# Node affinity is a set of rules used by the scheduler to determine where a pod 
+# can be placed. It expands upon `nodeSelector` with much more expressive syntax.
+#
+# TWO TYPES OF AFFINITY RULES:
+# 1. requiredDuringSchedulingIgnoredDuringExecution (HARD rule):
+#    - The scheduler CANNOT schedule the Pod unless the rule is met.
+#    - If no node matches, the pod stays in Pending state!
+#
+# 2. preferredDuringSchedulingIgnoredDuringExecution (SOFT preference):
+#    - The scheduler will TRY to find a node that meets the rule.
+#    - If no matching node is available, the scheduler still schedules the pod on another node.
+#    - Uses a `weight` (1 to 100) to prioritize matching nodes.
+#
+# WHAT DOES 'IgnoredDuringExecution' MEAN?
+# If node labels change AFTER the pod is running, the running pod is NOT evicted.
+#
+# OPERATORS: In, NotIn, Exists, DoesNotExist, Gt, Lt
+#
+# IMPORTANT CLI COMMANDS:
+# - Apply:        kubectl apply -f node-affinity.yaml
+# - Describe Pod: kubectl describe pod advanced-affinity-pod
+# ==============================================================================
+
+apiVersion: v1
+kind: Pod
+
+metadata:
+  name: advanced-affinity-pod
+  namespace: default
+  labels:
+    app: analytics-processor
+
+spec:
+  affinity:
+    nodeAffinity:
+      # ------------------------------------------------------------------------
+      # 1. HARD RULE (Required)
+      # ------------------------------------------------------------------------
+      requiredDuringSchedulingIgnoredDuringExecution:
+        nodeSelectorTerms:
+          - matchExpressions:
+              # Must run on Linux nodes
+              - key: kubernetes.io/os
+                operator: In
+                values: ["linux"]
+              # Must run in primary availability zones (us-east-1a or us-east-1b)
+              - key: topology.kubernetes.io/zone
+                operator: In
+                values:
+                  - us-east-1a
+                  - us-east-1b
+
+      # ------------------------------------------------------------------------
+      # 2. SOFT RULE (Preferred - Best Effort)
+      # ------------------------------------------------------------------------
+      preferredDuringSchedulingIgnoredDuringExecution:
+        # Preference 1: Prefer nodes with GPU accelerators (weight 80 / 100)
+        - weight: 80
+          preference:
+            matchExpressions:
+              - key: accelerator
+                operator: In
+                values: ["nvidia-tesla-t4"]
+
+        # Preference 2: Prefer compute-optimized instances (weight 20 / 100)
+        - weight: 20
+          preference:
+            matchExpressions:
+              - key: node.kubernetes.io/instance-type
+                operator: In
+                values: ["c5.large", "c6i.large"]
+
+  containers:
+    - name: analytics-worker
+      image: busybox:1.36
+      command: ["/bin/sh", "-c", "echo 'Node affinity pod active'; sleep 3600"]
+      resources:
+        requests:
+          cpu: "100m"
+          memory: "128Mi"
+        limits:
+          cpu: "250m"
+          memory: "256Mi"
+

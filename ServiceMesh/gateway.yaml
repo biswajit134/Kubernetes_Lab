@@ -1,0 +1,74 @@
+# ==============================================================================
+# Service Mesh Object: Gateway (Istio Networking CRD)
+# ==============================================================================
+# WHAT IS AN ISTIO GATEWAY?
+# An Istio Gateway describes a load balancer operating at the edge of the mesh 
+# receiving incoming or outgoing HTTP/TCP connections.
+#
+# HOW IT DIFFERS FROM KUBERNETES INGRESS:
+# - Kubernetes Ingress combines edge proxy provisioning and Layer 7 routing rules
+#   in a single monolithic resource.
+# - Istio decouples them:
+#   * Istio Gateway: Manages ports, protocols, and TLS certificates on the edge proxy.
+#   * Istio VirtualService: Binds to the Gateway to define routing, canary splitting,
+#     rewrites, and headers.
+#
+# NOTE ON GATEWAY API:
+# While Kubernetes SIG-Network created the new Gateway API (`gateway.networking.k8s.io`),
+# Istio's native Gateway CRD (`networking.istio.io/v1beta1`) remains widely used
+# across production Istio installations.
+#
+# IMPORTANT CLI COMMANDS:
+# - Apply:        kubectl apply -f gateway.yaml
+# - Get:          kubectl get gateway.networking.istio.io
+# - Describe:     kubectl describe gateway.networking.istio.io public-gateway
+# ==============================================================================
+
+apiVersion: networking.istio.io/v1beta1
+kind: Gateway
+
+metadata:
+  name: public-gateway
+  namespace: default
+  labels:
+    tier: edge-gateway
+
+spec:
+  # ----------------------------------------------------------------------------
+  # Selector: Selects the Pods running the Istio Ingress Gateway proxy
+  # By default, Istio's ingress gateway pod is labeled 'istio: ingressgateway'
+  # ----------------------------------------------------------------------------
+  selector:
+    istio: ingressgateway
+
+  # ----------------------------------------------------------------------------
+  # Servers: Port and protocol configurations
+  # ----------------------------------------------------------------------------
+  servers:
+    # --- Server 1: HTTP Port 80 (with automatic HTTPS redirect) ---
+    - port:
+        number: 80
+        name: http
+        protocol: HTTP
+      hosts:
+        - "api.mycompany.com"
+        - "store.mycompany.com"
+      tls:
+        # Redirect all cleartext HTTP traffic to HTTPS on port 443
+        httpsRedirect: true
+
+    # --- Server 2: HTTPS Port 443 with TLS Termination ---
+    - port:
+        number: 443
+        name: https
+        protocol: HTTPS
+      hosts:
+        - "api.mycompany.com"
+        - "store.mycompany.com"
+      tls:
+        mode: SIMPLE # Standard server TLS termination
+        # Name of Kubernetes Secret containing TLS certificates
+        # Stored in the same namespace as the ingress gateway (usually 'istio-system')
+        credentialName: mycompany-tls-secret
+        minProtocolVersion: TLSV1_3 # Enforce modern TLS 1.3
+

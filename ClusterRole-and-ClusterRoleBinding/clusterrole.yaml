@@ -1,0 +1,46 @@
+# ==============================================================================
+# Kubernetes Object: ClusterRole (RBAC)
+# ==============================================================================
+# WHAT IS A CLUSTERROLE?
+# While a standard Role is scoped to a single namespace, a ClusterRole is a 
+# CLUSTER-SCOPED resource.
+#
+# WHEN TO USE A CLUSTERROLE:
+# 1. Cluster-scoped resources: Grant access to resources that do NOT live in any 
+#    namespace (e.g., Nodes, PersistentVolumes, Namespaces, StorageClasses).
+# 2. Non-resource endpoints: Grant access to URL paths like /healthz or /metrics.
+# 3. Reusable across namespaces: Define a permission set once (e.g., "secret-reader")
+#    and bind it in multiple distinct namespaces using standard RoleBindings!
+# 4. Cluster-wide permissions: Grant access to namespaced resources across ALL namespaces
+#    when paired with a ClusterRoleBinding.
+#
+# IMPORTANT CLI COMMANDS:
+# - Apply:        kubectl apply -f clusterrole.yaml
+# - Get:          kubectl get clusterrole
+# - Describe:     kubectl describe clusterrole node-and-pv-reader
+# ==============================================================================
+
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+
+metadata:
+  # Cluster-scoped, so NO namespace field is specified!
+  name: node-and-pv-reader
+  labels:
+    tier: cluster-rbac
+
+rules:
+  # Rule 1: Read-only access to cluster-scoped infrastructure resources
+  - apiGroups: [""]
+    resources: ["nodes", "persistentvolumes", "namespaces"]
+    verbs: ["get", "list", "watch"]
+
+  # Rule 2: Non-resource URL endpoint monitoring
+  - nonResourceURLs: ["/healthz", "/metrics"]
+    verbs: ["get"]
+
+  # Rule 3: Read-only access to StorageClasses
+  - apiGroups: ["storage.k8s.io"]
+    resources: ["storageclasses"]
+    verbs: ["get", "list", "watch"]
+

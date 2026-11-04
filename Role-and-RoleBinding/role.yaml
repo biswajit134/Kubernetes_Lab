@@ -1,0 +1,50 @@
+# ==============================================================================
+# Kubernetes Object: Role (RBAC)
+# ==============================================================================
+# WHAT IS A ROLE?
+# A Role contains rules that represent a set of permissions within a SINGLE namespace.
+# RBAC (Role-Based Access Control) permissions are purely additive (there are no "deny" rules).
+#
+# ROLE SCOPE:
+# A Role is NAMESPACE-SCOPED. It can only grant access to resources (Pods, ConfigMaps,
+# Deployments, Services) within its own specific namespace.
+#
+# THREE PILLARS OF RBAC RULES:
+# 1. apiGroups: The API group of the resource ("" = core, "apps", "batch", etc.).
+# 2. resources: The resource type (e.g., "pods", "services", "configmaps", "pods/log").
+# 3. verbs: Allowed actions (get, list, watch, create, update, patch, delete).
+#
+# IMPORTANT CLI COMMANDS:
+# - Apply:        kubectl apply -f role.yaml
+# - Get Roles:    kubectl get roles -n default
+# - Describe:     kubectl describe role pod-reader-role -n default
+# ==============================================================================
+
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+
+metadata:
+  name: pod-reader-role
+  namespace: default
+  labels:
+    tier: rbac-security
+
+# ------------------------------------------------------------------------------
+# Rules define what actions are allowed on which resources
+# ------------------------------------------------------------------------------
+rules:
+  # Rule 1: Read-only access to core resources (Pods and Services)
+  - apiGroups: [""] # "" indicates the core API group
+    resources: ["pods", "pods/log", "services"]
+    verbs: ["get", "list", "watch"]
+
+  # Rule 2: Full CRUD access to ConfigMaps in this namespace
+  - apiGroups: [""]
+    resources: ["configmaps"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+
+  # Rule 3: Read and update Deployments in the 'apps' API group
+  - apiGroups: ["apps"]
+    resources: ["deployments"]
+    verbs: ["get", "list", "watch", "update", "patch"]
+

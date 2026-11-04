@@ -1,0 +1,61 @@
+# ==============================================================================
+# Kubernetes Object: ResourceQuota
+# ==============================================================================
+# WHAT IS A RESOURCEQUOTA?
+# A ResourceQuota provides constraints that limit aggregate resource consumption 
+# per namespace. It prevents one team or rogue application from consuming all 
+# compute, storage, or API object slots in the cluster (noisy neighbor problem).
+#
+# PREREQUISITE:
+# When a ResourceQuota is applied for compute resources (CPU/Memory), every pod 
+# created in that namespace MUST specify explicit resource requests and limits, 
+# or a LimitRange must be configured to provide default values.
+#
+# IMPORTANT CLI COMMANDS:
+# - Apply:    kubectl apply -f resource-quota.yaml
+# - View:     kubectl get resourcequota -n development
+# - Inspect:  kubectl describe resourcequota dev-compute-quota -n development
+# ==============================================================================
+
+apiVersion: v1
+kind: ResourceQuota
+
+metadata:
+  name: dev-compute-quota
+  # Specify the namespace this quota enforces boundaries on
+  namespace: development
+  labels:
+    environment: dev
+    managed-by: platform-admin
+
+spec:
+  # Hard limits defined for aggregate resources across all pods in this namespace
+  hard:
+    # --- Compute Resources ---
+    # Total sum of CPU requests across all running pods cannot exceed 4 cores (4000m)
+    requests.cpu: "4"
+    # Total sum of CPU limits across all running pods cannot exceed 8 cores
+    limits.cpu: "8"
+    # Total sum of Memory requests across all running pods cannot exceed 8Gi
+    requests.memory: 8Gi
+    # Total sum of Memory limits across all running pods cannot exceed 16Gi
+    limits.memory: 16Gi
+
+    # --- Storage Resources ---
+    # Total sum of storage requested by all PersistentVolumeClaims cannot exceed 50Gi
+    requests.storage: 50Gi
+    # Maximum number of PersistentVolumeClaims allowed in the namespace
+    persistentvolumeclaims: "10"
+
+    # --- Object Counts ---
+    # Total number of concurrent Pods allowed in the namespace
+    pods: "20"
+    # Total number of standard ClusterIP/NodePort Services
+    services: "10"
+    # Total number of cloud LoadBalancer services (prevents high cloud provider bills)
+    services.loadbalancers: "2"
+    # Total number of ConfigMaps
+    configmaps: "30"
+    # Total number of Secrets
+    secrets: "30"
+

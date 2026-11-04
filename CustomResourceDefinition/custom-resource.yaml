@@ -1,0 +1,35 @@
+# ==============================================================================
+# Kubernetes Custom Resource Instance
+# ==============================================================================
+# WHAT IS A CUSTOM RESOURCE INSTANCE?
+# Once a CustomResourceDefinition (CRD) is applied to the cluster, the Kubernetes
+# API server understands the new kind! You can now create objects of that kind,
+# just like creating a Pod or Service.
+#
+# PREREQUISITE:
+# The CRD 'crd.yaml' MUST be applied before applying this resource!
+#
+# IMPORTANT CLI COMMANDS:
+# - Apply:        kubectl apply -f custom-resource.yaml
+# - Get:          kubectl get databases (or kubectl get db)
+# - Describe:     kubectl describe db production-postgres
+# - Delete:       kubectl delete db production-postgres
+# ==============================================================================
+
+apiVersion: company.example.com/v1alpha1
+kind: Database
+
+metadata:
+  name: production-postgres
+  namespace: default
+  labels:
+    tier: database
+    environment: production
+
+spec:
+  # Validated against the OpenAPI v3 schema defined in the CRD:
+  engine: postgres
+  version: "15.4"
+  replicas: 2
+  storageSize: 20Gi
+

@@ -1,0 +1,78 @@
+# ==============================================================================
+# Observability Object: PrometheusRule (Prometheus Operator CRD)
+# ==============================================================================
+# WHAT IS A PROMETHEUSRULE?
+# A PrometheusRule defines alerting rules and recording rules using PromQL.
+# The Prometheus Operator continuously translates these CRDs into Prometheus 
+# native rule files dynamically.
+#
+# TWO TYPES OF RULES:
+# 1. Alerting Rules (`alert`):
+#    - Evaluates PromQL expressions (e.g., error rate > 5% or CPU > 90%).
+#    - When condition stays true for `for: 5m`, fires an alert to Alertmanager.
+# 2. Recording Rules (`record`):
+#    - Precomputes frequently needed or computationally expensive PromQL expressions.
+#    - Saves the result as a new lightweight time-series (e.g. `job:http_requests:rate5m`).
+#
+# IMPORTANT CLI COMMANDS:
+# - Apply:        kubectl apply -f prometheusrule.yaml
+# - Get Rules:    kubectl get prometheusrules (or pr) -A
+# - Describe:     kubectl describe pr app-alerting-rules
+# ==============================================================================
+
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+
+metadata:
+  name: app-alerting-rules
+  namespace: default
+  labels:
+    release: prometheus-stack
+    role: alert-rules
+
+spec:
+  groups:
+    - name: application-health-alerts
+      # Evaluation interval for this rule group
+      interval: 30s
+      rules:
+        # ----------------------------------------------------------------------
+        # Alert 1: High Pod Error Rate
+        # ----------------------------------------------------------------------
+        - alert: HighHttpErrorRate
+          # PromQL expression: Calculate 5xx error percentage over 5 minutes
+          expr: |
+            sum(rate(http_requests_total{status=~"5.."}[5m]))
+            /
+            sum(rate(http_requests_total[5m])) * 100 > 5
+          # The condition must persist continuously for 5 minutes before firing
+          for: 5m
+          labels:
+            severity: critical
+            team: backend
+            tier: api
+          annotations:
+            summary: "High HTTP 5xx error rate on {{ $labels.instance }}"
+            description: "Service {{ $labels.app }} has error rate of {{ $value }}% (above 5% threshold) for more than 5 minutes."
+            runbook_url: "https://wiki.mycompany.internal/runbooks/high-error-rate"
+
+        # ----------------------------------------------------------------------
+        # Alert 2: Pod Frequently Restarting (CrashLooping)
+        # ----------------------------------------------------------------------
+        - alert: PodCrashLooping
+          expr: |
+            rate(kube_pod_container_status_restarts_total[15m]) * 60 * 5 > 0
+          for: 10m
+          labels:
+            severity: warning
+            team: platform
+          annotations:
+            summary: "Pod {{ $labels.pod }} is restarting frequently"
+            description: "Container {{ $labels.container }} in Pod {{ $labels.pod }} restarted {{ $value }} times in last 15 minutes."
+
+        # ----------------------------------------------------------------------
+        # Recording Rule: Precomputed request rate per service
+        # ----------------------------------------------------------------------
+        - record: job:http_requests:rate5m
+          expr: sum by (job) (rate(http_requests_total[5m]))
+

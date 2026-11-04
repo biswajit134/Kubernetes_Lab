@@ -1,0 +1,87 @@
+# ==============================================================================
+# Kubernetes Scheduling: Pod Affinity & Anti-Affinity
+# ==============================================================================
+# WHAT IS POD AFFINITY & ANTI-AFFINITY?
+# While Node Affinity matches labels on NODES, Pod Affinity and Anti-Affinity
+# constrain which nodes your Pod can be scheduled on based on labels on OTHER PODS
+# already running on those nodes.
+#
+# TWO OPPOSING GOALS:
+# 1. Pod Affinity (CO-LOCATION):
+#    "Run me on the same node (or zone) as Pod X" (e.g., place web frontend close
+#    to Redis cache to minimize network latency).
+#
+# 2. Pod Anti-Affinity (HIGH AVAILABILITY / SPREAD):
+#    "DO NOT run me on the same node (or zone) as other copies of myself" 
+#    (e.g., ensure 3 replicas of an API are not all placed on the same physical
+#    host, so host failure won't take down the entire service).
+#
+# TOPOLOGY KEY:
+# topologyKey determines the scope of the domain (e.g. "kubernetes.io/hostname"
+# for per-node, or "topology.kubernetes.io/zone" for per-availability-zone).
+#
+# IMPORTANT CLI COMMANDS:
+# - Apply:        kubectl apply -f pod-affinity-antiaffinity.yaml
+# - Check nodes:  kubectl get pods -o wide (notice how replicas are spread across different nodes)
+# ==============================================================================
+
+apiVersion: apps/v1
+kind: Deployment
+
+metadata:
+  name: ha-web-service
+  namespace: default
+  labels:
+    app: ha-web
+
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: ha-web
+
+  template:
+    metadata:
+      labels:
+        app: ha-web
+    spec:
+      affinity:
+        # ----------------------------------------------------------------------
+        # 1. POD AFFINITY: Co-locate this pod with Redis cache pods
+        # ----------------------------------------------------------------------
+        podAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                labelSelector:
+                  matchExpressions:
+                    - key: app
+                      operator: In
+                      values: ["redis-cache"]
+                # Scope to the same physical node
+                topologyKey: kubernetes.io/hostname
+
+        # ----------------------------------------------------------------------
+        # 2. POD ANTI-AFFINITY: Never place two replicas of ha-web on the SAME node!
+        # ----------------------------------------------------------------------
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchExpressions:
+                  - key: app
+                    operator: In
+                    values: ["ha-web"]
+              # Ensures no two 'ha-web' pods share the same node hostname
+              topologyKey: kubernetes.io/hostname
+
+      containers:
+        - name: web
+          image: nginx:1.25-alpine
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "128Mi"
+            limits:
+              cpu: "250m"
+              memory: "256Mi"
+

@@ -1,0 +1,75 @@
+# ==============================================================================
+# Service Mesh Object: Telemetry (Istio Telemetry CRD)
+# ==============================================================================
+# WHAT IS THE TELEMETRY CRD?
+# The Telemetry API enables flexible configuration of observability data generated
+# by the Envoy proxies:
+# 1. Distributed Tracing: Jaeger, Zipkin, or OpenTelemetry (OTel) sampling rates.
+# 2. Access Logging: Envoy access log formats, filtering, and destination providers.
+# 3. Metrics Reporting: Prometheus metrics customization and tag generation.
+#
+# WHY USE THIS OVER GLOBAL ISTIO CONFIGURATION?
+# - Granular Control: Apply custom tracing rates per namespace or workload rather
+#   than 100% across the entire cluster.
+# - High-Traffic Services: Reduce trace sampling from 100% to 1% on heavy endpoints
+#   to save network bandwidth and storage costs.
+# - Debugging: Enable detailed verbose JSON access logs temporarily for a failing service.
+#
+# IMPORTANT CLI COMMANDS:
+# - Apply:        kubectl apply -f telemetry.yaml
+# - Get:          kubectl get telemetry
+# - Describe:     kubectl describe telemetry custom-tracing-and-logs
+# ==============================================================================
+
+apiVersion: telemetry.istio.io/v1alpha1
+kind: Telemetry
+
+metadata:
+  name: custom-tracing-and-logs
+  namespace: default
+  labels:
+    tier: observability
+
+spec:
+  # ----------------------------------------------------------------------------
+  # Workload Selector: Apply to pods labeled 'app: reviews'
+  # If omitted, applies to all workloads in the namespace.
+  # ----------------------------------------------------------------------------
+  selector:
+    matchLabels:
+      app: reviews
+
+  # ----------------------------------------------------------------------------
+  # 1. Tracing Configuration (OpenTelemetry / Jaeger)
+  # ----------------------------------------------------------------------------
+  tracing:
+    # Sampling percentage: 10% of requests are traced
+    - randomSamplingPercentage: 10.0
+      # Custom tags injected into distributed traces
+      customTags:
+        environment:
+          literal:
+            value: "production"
+        client_version:
+          header:
+            name: "X-Client-Version"
+            defaultValue: "unknown"
+
+  # ----------------------------------------------------------------------------
+  # 2. Access Logging Configuration
+  # ----------------------------------------------------------------------------
+  accessLogging:
+    # Disable logging for 2xx successful health checks to avoid log spam
+    - match:
+        mode: CLIENT_AND_SERVER
+      filter:
+        expression: "response.code >= 400" # Only log HTTP errors (4xx, 5xx)
+
+  # ----------------------------------------------------------------------------
+  # 3. Metrics Configuration
+  # ----------------------------------------------------------------------------
+  metrics:
+    - providers:
+        - name: prometheus
+      # Custom metric overrides can be defined here
+

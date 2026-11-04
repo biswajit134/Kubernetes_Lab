@@ -1,0 +1,175 @@
+# ==============================================================================
+# Gateway API Object: HTTPRoute
+# ==============================================================================
+# WHAT IS AN HTTPROUTE?
+# An HTTPRoute defines HTTP/HTTPS routing rules that attach to a Gateway listener.
+# It is the primary replacement for the traditional Ingress resource and is vastly
+# more powerful.
+#
+# CAPABILITIES BEYOND INGRESS:
+# 1. Header-Based Routing:    Match on specific HTTP headers or query parameters.
+# 2. Method-Based Routing:    Route only GET, POST, DELETE, etc.
+# 3. Traffic Splitting:       Weighted distribution across multiple backends (canary).
+# 4. Request Mirroring:       Send a copy of live traffic to a shadow/test service.
+# 5. URL Rewriting:           Rewrite the request path or hostname before forwarding.
+# 6. Request/Response Mods:   Add, remove, or set HTTP headers dynamically.
+# 7. Timeouts & Retries:      Fine-grained per-route timeout and retry budgets.
+# 8. Cross-Namespace Routing: Route to Services in different namespaces via ReferenceGrant.
+#
+# IMPORTANT CLI COMMANDS:
+# - Apply:        kubectl apply -f httproute.yaml
+# - Get:          kubectl get httproute
+# - Describe:     kubectl describe httproute app-routes
+# ==============================================================================
+
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+
+metadata:
+  name: app-routes
+  namespace: default
+  labels:
+    app: api-gateway
+    tier: routing
+
+spec:
+  # ----------------------------------------------------------------------------
+  # ParentRefs: Which Gateway listener(s) this route attaches to
+  # ----------------------------------------------------------------------------
+  parentRefs:
+    - name: main-gateway
+      namespace: default
+      # Attach specifically to the HTTPS listener (by sectionName)
+      sectionName: https-listener
+
+  # Hostnames this route applies to (must be a subset of the Gateway listener's hostname)
+  hostnames:
+    - "api.example.com"
+
+  # ----------------------------------------------------------------------------
+  # Rules: Define matching conditions and backend destinations
+  # ----------------------------------------------------------------------------
+  rules:
+    # --------------------------------------------------------------------------
+    # Rule 1: Path-prefix routing with traffic splitting (Canary Deployment)
+    # --------------------------------------------------------------------------
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /api/v1
+      # Weighted backend distribution (90% stable, 10% canary)
+      backendRefs:
+        - name: api-service-stable
+          port: 80
+          weight: 90
+        - name: api-service-canary
+          port: 80
+          weight: 10
+
+    # --------------------------------------------------------------------------
+    # Rule 2: Header-based routing (route internal traffic to a debug backend)
+    # --------------------------------------------------------------------------
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /api/v1
+          headers:
+            # Match when a specific custom header is present
+            - name: X-Debug-Mode
+              type: Exact
+              value: "enabled"
+      backendRefs:
+        - name: api-service-debug
+          port: 80
+
+    # --------------------------------------------------------------------------
+    # Rule 3: Method-based routing (only POST requests to /orders)
+    # --------------------------------------------------------------------------
+    - matches:
+        - path:
+            type: Exact
+            value: /orders
+          method: POST
+      backendRefs:
+        - name: order-write-service
+          port: 8080
+
+    # --------------------------------------------------------------------------
+    # Rule 4: Query parameter matching
+    # --------------------------------------------------------------------------
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /search
+          queryParams:
+            - name: version
+              type: Exact
+              value: "beta"
+      backendRefs:
+        - name: search-beta-service
+          port: 80
+
+    # --------------------------------------------------------------------------
+    # Rule 5: URL Rewriting and Header Modification
+    # --------------------------------------------------------------------------
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /legacy-api
+      # Filters modify the request before forwarding to the backend
+      filters:
+        # Rewrite the URL path: /legacy-api/users -> /v2/users
+        - type: URLRewrite
+          urlRewrite:
+            path:
+              type: ReplacePrefixMatch
+              replacePrefixMatch: /v2
+
+        # Add a custom header to the forwarded request
+        - type: RequestHeaderModifier
+          requestHeaderModifier:
+            add:
+              - name: X-Forwarded-By
+                value: "gateway-api"
+            set:
+              - name: X-Request-Source
+                value: "legacy-redirect"
+            remove:
+              - X-Old-Header
+
+      backendRefs:
+        - name: api-service-stable
+          port: 80
+
+    # --------------------------------------------------------------------------
+    # Rule 6: Request Mirroring (shadow traffic for testing)
+    # --------------------------------------------------------------------------
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /api/v2
+      filters:
+        # Mirror: sends a copy of live traffic to the shadow service
+        # The shadow service's response is DISCARDED (does not affect the client)
+        - type: RequestMirror
+          requestMirror:
+            backendRef:
+              name: api-shadow-service
+              port: 80
+      backendRefs:
+        - name: api-service-stable
+          port: 80
+
+    # --------------------------------------------------------------------------
+    # Rule 7: HTTP-to-HTTPS Redirect
+    # --------------------------------------------------------------------------
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /
+      filters:
+        - type: RequestRedirect
+          requestRedirect:
+            scheme: https
+            statusCode: 301
+

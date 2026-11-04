@@ -1,0 +1,99 @@
+# ==============================================================================
+# Observability Object: Prometheus Instance (Prometheus Operator CRD)
+# ==============================================================================
+# WHAT IS THE PROMETHEUS CRD?
+# The `Prometheus` custom resource defines a desired Prometheus deployment managed
+# by the Prometheus Operator.
+#
+# WHAT DOES THE PROMETHEUS OPERATOR DO WITH THIS?
+# 1. Deploys and manages a stateful Prometheus cluster (StatefulSet).
+# 2. Automatically binds matching `ServiceMonitor`, `PodMonitor`, and `PrometheusRule` objects.
+# 3. Mounts persistent storage, configures scrape intervals, and sets retention limits.
+# 4. Generates and reloads the runtime Prometheus configuration dynamically without downtime.
+#
+# IMPORTANT CLI COMMANDS:
+# - Apply:             kubectl apply -f prometheus.yaml
+# - Get Prometheus:    kubectl get prometheus -n default
+# - Port Forward Web:  kubectl port-forward svc/prometheus-operated 9090:9090
+# ==============================================================================
+
+apiVersion: monitoring.coreos.com/v1
+kind: Prometheus
+
+metadata:
+  name: lab-prometheus
+  namespace: default
+  labels:
+    tier: monitoring
+    prometheus: lab-prometheus
+
+spec:
+  # Number of Prometheus replicas (for high availability)
+  replicas: 2
+
+  # ServiceAccount with permissions to discover endpoints across the cluster
+  serviceAccountName: prometheus-k8s
+
+  # Base image and version tag
+  image: quay.io/prometheus/prometheus:v2.48.0
+
+  # Data retention period (time-based) or retentionSize (disk-based)
+  retention: 15d
+  retentionSize: 40Gi
+
+  # Global scrape interval
+  scrapeInterval: 15s
+  evaluationInterval: 15s
+
+  # ----------------------------------------------------------------------------
+  # Selectors: Which ServiceMonitors, PodMonitors, and Rules to include
+  # ----------------------------------------------------------------------------
+  # Match ServiceMonitors labeled 'release: prometheus-stack'
+  serviceMonitorSelector:
+    matchLabels:
+      release: prometheus-stack
+
+  # Match PodMonitors labeled 'release: prometheus-stack'
+  podMonitorSelector:
+    matchLabels:
+      release: prometheus-stack
+
+  # Match PrometheusRules labeled 'role: alert-rules'
+  ruleSelector:
+    matchLabels:
+      role: alert-rules
+
+  # Search across all namespaces for monitors (empty dictionary = all namespaces)
+  serviceMonitorNamespaceSelector: {}
+  podMonitorNamespaceSelector: {}
+  ruleNamespaceSelector: {}
+
+  # ----------------------------------------------------------------------------
+  # Alertmanager Integration
+  # ----------------------------------------------------------------------------
+  alerting:
+    alertmanagers:
+      - namespace: default
+        name: alertmanager-operated
+        port: web
+
+  # ----------------------------------------------------------------------------
+  # Storage Specification (Persistent Volume Claim Template)
+  # ----------------------------------------------------------------------------
+  storage:
+    volumeClaimTemplate:
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        resources:
+          requests:
+            storage: 50Gi
+
+  # Resource requests and limits for Prometheus containers
+  resources:
+    requests:
+      cpu: 500m
+      memory: 2Gi
+    limits:
+      cpu: "2"
+      memory: 4Gi
+

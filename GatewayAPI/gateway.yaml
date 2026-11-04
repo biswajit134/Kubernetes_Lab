@@ -1,0 +1,121 @@
+# ==============================================================================
+# Gateway API Object: Gateway
+# ==============================================================================
+# WHAT IS A GATEWAY?
+# A Gateway represents an instance of a load balancer or proxy that handles
+# traffic entering or leaving the cluster. It defines network listeners
+# (ports, protocols, TLS settings) that Routes (HTTPRoute, TCPRoute, etc.)
+# attach to.
+#
+# ANALOGY:
+# Think of a Gateway as the physical "front door" (like an NGINX or Envoy
+# proxy deployment). Routes are the "routing rules" inside that proxy.
+#
+# KEY CONCEPT: LISTENERS
+# A Gateway declares one or more Listeners, each binding a port + protocol.
+# Listeners define WHICH traffic the Gateway accepts. Routes then specify
+# WHERE that traffic goes (which backend Services).
+#
+# LISTENER PROTOCOLS:
+# - HTTP   : Unencrypted HTTP (port 80 typically)
+# - HTTPS  : TLS-terminated HTTPS (port 443 typically)
+# - TLS    : TLS passthrough (does not terminate; passes raw TLS to backends)
+# - TCP    : Raw TCP traffic (e.g., databases, message brokers)
+# - UDP    : Raw UDP traffic (e.g., DNS, gaming)
+#
+# IMPORTANT CLI COMMANDS:
+# - Apply:        kubectl apply -f gateway.yaml
+# - Get:          kubectl get gateway (or gtw)
+# - Describe:     kubectl describe gateway main-gateway
+# - Check Status: kubectl get gateway main-gateway -o yaml (check status.addresses for IP)
+# ==============================================================================
+
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+
+metadata:
+  name: main-gateway
+  namespace: default
+  labels:
+    app: api-gateway
+    tier: networking
+  annotations:
+    # Controller-specific annotations (example for cloud IP allocation)
+    networking.gke.io/certmap: "my-cert-map"
+
+spec:
+  # Reference to the GatewayClass that controls this Gateway's implementation
+  gatewayClassName: production-gateway-class
+
+  # ----------------------------------------------------------------------------
+  # Listeners: Define the ports and protocols this Gateway accepts traffic on
+  # ----------------------------------------------------------------------------
+  listeners:
+    # --- Listener 1: HTTP on port 80 ---
+    - name: http-listener
+      port: 80
+      protocol: HTTP
+      hostname: "*.example.com"
+      # allowedRoutes controls which namespaces can attach Routes to this listener
+      allowedRoutes:
+        namespaces:
+          # 'All' allows any namespace; 'Same' restricts to Gateway's namespace;
+          # 'Selector' uses label matching
+          from: Selector
+          selector:
+            matchLabels:
+              gateway-access: "true"
+
+    # --- Listener 2: HTTPS on port 443 with TLS termination ---
+    - name: https-listener
+      port: 443
+      protocol: HTTPS
+      hostname: "api.example.com"
+      # TLS configuration for this listener
+      tls:
+        # Mode options:
+        # - Terminate: Gateway terminates TLS and forwards plaintext to backends
+        # - Passthrough: Gateway forwards encrypted traffic directly to backends
+        mode: Terminate
+        certificateRefs:
+          # Reference to a Kubernetes Secret containing tls.crt and tls.key
+          - kind: Secret
+            name: api-tls-cert
+            namespace: default
+      allowedRoutes:
+        namespaces:
+          from: Same
+
+    # --- Listener 3: HTTPS on port 443 for a different hostname ---
+    - name: store-https-listener
+      port: 443
+      protocol: HTTPS
+      hostname: "store.example.com"
+      tls:
+        mode: Terminate
+        certificateRefs:
+          - kind: Secret
+            name: store-tls-cert
+      allowedRoutes:
+        namespaces:
+          from: All
+
+    # --- Listener 4: Raw TCP on port 5432 (e.g., Postgres proxy) ---
+    - name: tcp-database-listener
+      port: 5432
+      protocol: TCP
+      allowedRoutes:
+        kinds:
+          # Restrict which Route types can bind to this listener
+          - group: gateway.networking.k8s.io
+            kind: TCPRoute
+        namespaces:
+          from: Same
+
+  # ----------------------------------------------------------------------------
+  # Infrastructure: Optional infrastructure-level configuration
+  # ----------------------------------------------------------------------------
+  # infrastructure:
+  #   annotations:
+  #     service.beta.kubernetes.io/aws-load-balancer-type: "external"
+

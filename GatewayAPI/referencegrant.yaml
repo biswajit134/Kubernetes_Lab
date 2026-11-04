@@ -1,0 +1,67 @@
+# ==============================================================================
+# Gateway API Object: ReferenceGrant
+# ==============================================================================
+# WHAT IS A REFERENCEGRANT?
+# ReferenceGrant is a core Gateway API security resource that enables cross-namespace
+# references in a controlled, opt-in manner.
+#
+# THE PROBLEM IT SOLVES:
+# By default, a Route in namespace 'prod' cannot reference a Service or Secret in 
+# namespace 'shared-services' or vice versa. Blindly allowing cross-namespace references 
+# would create security vulnerabilities (e.g. an unauthorized developer mounting someone 
+# else's TLS secret or hijacking traffic).
+#
+# HOW IT WORKS:
+# The owner of the target namespace explicitly creates a ReferenceGrant that permits 
+# incoming references from specific resources in other namespaces.
+#
+# COMMON USE CASES:
+# 1. Gateway in 'infra' namespace referencing a TLS Secret in 'cert-manager' namespace.
+# 2. HTTPRoute in 'dev' namespace referencing a shared database or auth Service in 'shared'.
+# 3. HTTPRoute in 'marketing' namespace attaching to a Gateway in 'ingress-infra'.
+#
+# IMPORTANT CLI COMMANDS:
+# - Apply:        kubectl apply -f referencegrant.yaml
+# - Get:          kubectl get referencegrant (or refgrant)
+# - Describe:     kubectl describe referencegrant allow-cross-namespace-service
+# ==============================================================================
+
+apiVersion: gateway.networking.k8s.io/v1beta1
+kind: ReferenceGrant
+
+metadata:
+  name: allow-cross-namespace-service
+  # Must be deployed in the TARGET namespace (where the protected resource lives!)
+  namespace: shared-services
+  labels:
+    tier: security
+    role: authorization
+
+spec:
+  # ----------------------------------------------------------------------------
+  # FROM: Who is allowed to reference resources in this namespace?
+  # ----------------------------------------------------------------------------
+  from:
+    # Allow HTTPRoutes from the 'frontend' namespace
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      namespace: frontend
+
+    # Allow Gateways from the 'infra-gateway' namespace (e.g., to reference secrets)
+    - group: gateway.networking.k8s.io
+      kind: Gateway
+      namespace: infra-gateway
+
+  # ----------------------------------------------------------------------------
+  # TO: Which specific resources inside THIS namespace can they reference?
+  # ----------------------------------------------------------------------------
+  to:
+    # Permit referencing Services (e.g. shared-auth-service)
+    - group: "" # Core Kubernetes group for Service
+      kind: Service
+      name: shared-auth-service # Optional: restrict to a specific named service
+
+    # Permit referencing Secrets (e.g. wildcard TLS certificate)
+    - group: "" # Core Kubernetes group for Secret
+      kind: Secret
+

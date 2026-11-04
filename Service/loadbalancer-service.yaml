@@ -1,0 +1,55 @@
+# ==============================================================================
+# Kubernetes Object: Service (LoadBalancer)
+# ==============================================================================
+# WHAT IS A LOADBALANCER SERVICE?
+# A LoadBalancer service provisions an external cloud load balancer 
+# (e.g., AWS NLB/ALB, Google Cloud Network Load Balancer, Azure Load Balancer) 
+# and assigns a public/external IP address to the Service.
+#
+# HOW IT WORKS:
+# 1. Cloud Provider controller provisions a cloud load balancer.
+# 2. Automatically configures NodePort and ClusterIP underneath.
+# 3. Routes incoming traffic from public internet directly to worker node NodePorts.
+#
+# IMPORTANT CLI COMMANDS:
+# - Apply:        kubectl apply -f loadbalancer-service.yaml
+# - Get IP:       kubectl get svc public-api-service -w (watch until EXTERNAL-IP is assigned)
+# ==============================================================================
+
+apiVersion: v1
+kind: Service
+
+metadata:
+  name: public-api-service
+  namespace: default
+  labels:
+    app: public-api
+  annotations:
+    # Cloud-specific annotations (example for AWS NLB)
+    service.beta.kubernetes.io/aws-load-balancer-type: "external"
+    service.beta.kubernetes.io/aws-load-balancer-nlb-target-type: "ip"
+    service.beta.kubernetes.io/aws-load-balancer-scheme: "internet-facing"
+
+spec:
+  type: LoadBalancer
+
+  # Preserves client original IP and minimizes network hops
+  externalTrafficPolicy: Local
+
+  # Restrict which client IP CIDRs can connect through the load balancer firewall
+  loadBalancerSourceRanges:
+    - 0.0.0.0/0          # Allows all (restrict in production to trusted IP ranges)
+
+  selector:
+    app: public-api
+
+  ports:
+    - name: https
+      port: 443
+      targetPort: 8443
+      protocol: TCP
+    - name: http
+      port: 80
+      targetPort: 8080
+      protocol: TCP
+

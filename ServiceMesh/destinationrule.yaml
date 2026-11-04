@@ -1,0 +1,89 @@
+# ==============================================================================
+# Service Mesh Object: DestinationRule (Istio Networking CRD)
+# ==============================================================================
+# WHAT IS A DESTINATIONRULE?
+# A DestinationRule defines policies that apply to traffic intended for a service 
+# AFTER routing has occurred (after VirtualService evaluation).
+#
+# KEY POLICIES CONFIGURED IN A DESTINATIONRULE:
+# 1. Subsets / Versions: Divides pods into logical groups using label selectors 
+#    (e.g., subset "v1" selects pods labeled 'version: v1').
+# 2. Load Balancing: ROUND_ROBIN, LEAST_CONN, RANDOM, or consistent hash.
+# 3. Connection Pooling: Controls maximum concurrent TCP/HTTP connections.
+# 4. Circuit Breaking (Outlier Detection): Ejects failing/unhealthy pods from the
+#    load balancing pool automatically before they cascade failures.
+# 5. Client TLS / mTLS Settings: Configures client sidecar TLS modes (ISTIO_MUTUAL, SIMPLE).
+#
+# CIRCUIT BREAKER CONCEPT:
+# If a microservice replica returns consecutive 5xx errors or takes too long,
+# the circuit opens, ejecting that specific instance temporarily. Once it recovers,
+# traffic is gradually allowed back in.
+#
+# IMPORTANT CLI COMMANDS:
+# - Apply:        kubectl apply -f destinationrule.yaml
+# - Get:          kubectl get destinationrules (or dr)
+# - Describe:     kubectl describe dr reviews-destination
+# ==============================================================================
+
+apiVersion: networking.istio.io/v1beta1
+kind: DestinationRule
+
+metadata:
+  name: reviews-destination
+  namespace: default
+  labels:
+    app: reviews
+    tier: service-mesh
+
+spec:
+  # The target service (matching the Kubernetes Service name)
+  host: reviews.default.svc.cluster.local
+
+  # ----------------------------------------------------------------------------
+  # Traffic Policy: Global rules applied across all subsets
+  # ----------------------------------------------------------------------------
+  trafficPolicy:
+    # Load Balancing Algorithm across endpoints
+    loadBalancer:
+      simple: LEAST_CONN # Options: ROUND_ROBIN, LEAST_CONN, RANDOM, PASSTHROUGH
+
+    # Connection Pool Management (prevents resource exhaustion)
+    connectionPool:
+      tcp:
+        maxConnections: 100 # Maximum open TCP connections
+      http:
+        http1MaxPendingRequests: 10 # Queue up to 10 pending HTTP/1 requests
+        maxRequestsPerConnection: 10 # Limit requests per connection before recycling
+
+    # Circuit Breaking via Outlier Detection
+    outlierDetection:
+      consecutive5xxErrors: 3 # Eject if 3 consecutive 5xx errors occur
+      interval: 10s # Check error rates every 10 seconds
+      baseEjectionTime: 30s # Eject the failing pod from pool for 30s
+      maxEjectionPercent: 50 # At most 50% of pods can be ejected simultaneously
+
+    # Client-side TLS configuration
+    tls:
+      # ISTIO_MUTUAL enables automatic cryptographic mTLS between Envoy sidecars
+      mode: ISTIO_MUTUAL
+
+  # ----------------------------------------------------------------------------
+  # Subsets: Named versions of the application selected by Pod labels
+  # ----------------------------------------------------------------------------
+  subsets:
+    - name: v1
+      labels:
+        version: v1
+
+    - name: v2
+      labels:
+        version: v2
+      # You can override traffic policies for specific subsets:
+      trafficPolicy:
+        loadBalancer:
+          simple: ROUND_ROBIN
+
+    - name: v3
+      labels:
+        version: v3
+

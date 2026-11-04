@@ -1,0 +1,45 @@
+# ==============================================================================
+# Kubernetes Object: PersistentVolumeClaim (PVC)
+# ==============================================================================
+# WHAT IS A PERSISTENTVOLUMECLAIM?
+# A PersistentVolumeClaim (PVC) is a request for storage by a user/developer.
+# It is similar to a Pod: Pods consume CPU and Memory resources; PVCs consume Storage.
+#
+# HOW PV & PVC BINDING WORKS:
+# 1. Developer submits a PVC asking for 5Gi of storage with 'ReadWriteOnce'.
+# 2. Kubernetes looks for an existing PV that meets the criteria, OR uses a 
+#    StorageClass to dynamically provision a new PV.
+# 3. Once bound (1-to-1 relationship), the PVC status becomes 'Bound'.
+# 4. Pods can then mount the PVC as a storage volume.
+#
+# IMPORTANT CLI COMMANDS:
+# - Apply:        kubectl apply -f persistentvolumeclaim.yaml
+# - Get PVCs:     kubectl get pvc
+# - Describe:     kubectl describe pvc app-data-pvc
+# ==============================================================================
+
+apiVersion: v1
+kind: PersistentVolumeClaim
+
+metadata:
+  name: app-data-pvc
+  namespace: default
+  labels:
+    app: stateful-app
+
+spec:
+  # Desired access modes (must match the PV or StorageClass capabilities)
+  accessModes:
+    - ReadWriteOnce
+
+  # StorageClass to use for dynamic provisioning, or 'manual-storage' for static PVs
+  storageClassName: manual-storage
+
+  # Volume mode: Filesystem (default) or Block
+  volumeMode: Filesystem
+
+  # Resource requests: Amount of storage required
+  resources:
+    requests:
+      storage: 5Gi
+

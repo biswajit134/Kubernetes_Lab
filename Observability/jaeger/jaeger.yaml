@@ -1,0 +1,81 @@
+# ==============================================================================
+# Observability Object: Jaeger (Jaeger Operator CRD)
+# ==============================================================================
+# WHAT IS JAEGER?
+# Jaeger is a CNCF-graduated distributed tracing platform used for monitoring
+# and troubleshooting microservices-based distributed systems:
+# 1. Distributed context propagation across microservices.
+# 2. Distributed transaction monitoring (trace visual waterfalls).
+# 3. Root cause analysis for latency bottlenecks and request timeouts.
+# 4. Service dependency graph analysis.
+#
+# STRATEGIES OFFERED BY JAEGER OPERATOR:
+# - `allInOne` (Default for dev/lab): Combines Agent, Collector, Query, and in-memory
+#   storage into a single pod. Data is lost on pod restart.
+# - `production`: Deploys Collector and Query independently, backed by scalable
+#   persistent storage (Elasticsearch or OpenSearch).
+# - `streaming`: Uses Kafka between Collector and Ingester for high-throughput buffering.
+#
+# IMPORTANT CLI COMMANDS:
+# - Apply:             kubectl apply -f jaeger.yaml
+# - Get:               kubectl get jaeger
+# - Access Jaeger UI:  kubectl port-forward svc/jaeger-query 16686:16686
+#                      (Open http://localhost:16686 in your browser)
+# ==============================================================================
+
+apiVersion: jaegertracing.io/v1
+kind: Jaeger
+
+metadata:
+  name: jaeger-instance
+  namespace: default
+  labels:
+    app: jaeger
+    tier: distributed-tracing
+
+spec:
+  # Strategy: allInOne (for testing/labs) or production (with Elasticsearch)
+  strategy: allInOne
+
+  # ----------------------------------------------------------------------------
+  # All-In-One Settings (Dev / Lab)
+  # ----------------------------------------------------------------------------
+  allInOne:
+    image: jaegertracing/all-in-one:1.50
+    options:
+      # Memory storage limit: max 10,000 traces in memory
+      memory:
+        max-traces: 10000
+      log-level: info
+    resources:
+      requests:
+        cpu: 200m
+        memory: 256Mi
+      limits:
+        cpu: 1000m
+        memory: 512Mi
+
+  # ----------------------------------------------------------------------------
+  # Storage Specification
+  # ----------------------------------------------------------------------------
+  storage:
+    type: memory # In production, switch to: type: elasticsearch or opensearch
+
+  # ----------------------------------------------------------------------------
+  # Ingress / Gateway for Query UI
+  # ----------------------------------------------------------------------------
+  ingress:
+    enabled: true
+    hosts:
+      - jaeger.mycompany.internal
+
+  # ----------------------------------------------------------------------------
+  # Collector Endpoints
+  # ----------------------------------------------------------------------------
+  collector:
+    # Expose OTLP endpoints to accept traces from OpenTelemetry collectors
+    options:
+      collector:
+        otlp:
+          enabled: true
+

@@ -1,0 +1,118 @@
+# ==============================================================================
+# Kubernetes Object: StatefulSet
+# ==============================================================================
+# WHAT IS A STATEFULSET?
+# A StatefulSet manages stateful applications that require:
+# 1. Stable, unique network identifiers (e.g., web-0, web-1, web-2).
+# 2. Stable, persistent storage (each Pod gets its own dedicated PersistentVolumeClaim
+#    that remains attached across restarts or rescheduling).
+# 3. Ordered, graceful deployment and scaling (0 -> 1 -> 2).
+# 4. Ordered, automated rolling updates (2 -> 1 -> 0).
+#
+# ESSENTIAL COMPONENTS OF A STATEFULSET:
+# - Headless Service: (ClusterIP: None) provides stable DNS SRV records for each Pod.
+#   DNS format: <pod-name>.<service-name>.<namespace>.svc.cluster.local
+#   Example:    web-0.database-headless.default.svc.cluster.local
+# - volumeClaimTemplates: Automatically provisions a unique PVC for EACH pod replica.
+#   (E.g., data-web-0, data-web-1).
+#
+# IMPORTANT CLI COMMANDS:
+# - Apply:        kubectl apply -f statefulset.yaml
+# - Get Pods:     kubectl get pods -l app=database-cluster (Notice deterministic names)
+# - View PVCs:    kubectl get pvc (Each pod has its own PVC)
+# - Scale:        kubectl scale statefulset database-cluster --replicas=3
+# ==============================================================================
+
+# ------------------------------------------------------------------------------
+# 1. HEADLESS SERVICE (Required for StatefulSet DNS resolution)
+# ------------------------------------------------------------------------------
+apiVersion: v1
+kind: Service
+metadata:
+  name: database-headless
+  namespace: default
+  labels:
+    app: database-cluster
+spec:
+  ports:
+    - port: 27017
+      name: mongodb
+  # clusterIP: None makes this a Headless Service!
+  clusterIP: None
+  selector:
+    app: database-cluster
+
+---
+# ------------------------------------------------------------------------------
+# 2. STATEFULSET DEFINITION
+# ------------------------------------------------------------------------------
+apiVersion: apps/v1
+kind: StatefulSet
+
+metadata:
+  name: database-cluster
+  namespace: default
+  labels:
+    app: database-cluster
+
+spec:
+  # The name of the Headless Service governing this StatefulSet
+  serviceName: "database-headless"
+
+  # Number of stateful pod replicas
+  replicas: 3
+
+  # Pod Management Policy:
+  # - OrderedReady (Default): Creates/deletes pods in sequential order (0, then 1, then 2).
+  # - Parallel: Creates or terminates pods simultaneously (faster, but less strict).
+  podManagementPolicy: OrderedReady
+
+  # Update Strategy:
+  # - RollingUpdate (Default): Updates pods from highest ordinal to lowest (2, then 1, then 0).
+  # - partition: Allows canary updates (only pods with ordinal >= partition will be updated).
+  updateStrategy:
+    type: RollingUpdate
+    rollingUpdate:
+      partition: 0
+
+  selector:
+    matchLabels:
+      app: database-cluster
+
+  template:
+    metadata:
+      labels:
+        app: database-cluster
+    spec:
+      terminationGracePeriodSeconds: 30
+      containers:
+        - name: mongo
+          image: mongo:6.0
+          ports:
+            - containerPort: 27017
+              name: mongodb
+          # Mounting the volume provisioned by volumeClaimTemplates
+          volumeMounts:
+            - name: data-storage
+              mountPath: /data/db
+          resources:
+            requests:
+              cpu: "200m"
+              memory: "256Mi"
+            limits:
+              cpu: "500m"
+              memory: "512Mi"
+
+  # ----------------------------------------------------------------------------
+  # volumeClaimTemplates: Creates a dedicated PVC for EACH replica!
+  # ----------------------------------------------------------------------------
+  volumeClaimTemplates:
+    - metadata:
+        name: data-storage
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        # In cloud clusters, specify storageClassName: "standard" or "gp3" or "fast"
+        resources:
+          requests:
+            storage: 5Gi
+

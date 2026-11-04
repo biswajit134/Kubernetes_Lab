@@ -1,0 +1,110 @@
+# ==============================================================================
+# Kubernetes Object: NetworkPolicy
+# ==============================================================================
+# WHAT IS A NETWORKPOLICY?
+# By default, Kubernetes pods are non-isolated: ANY pod can communicate with 
+# ANY other pod across ANY namespace!
+#
+# A NetworkPolicy is a set of Layer 3/4 firewall rules that specify how groups 
+# of Pods are allowed to communicate with each other and with other network endpoints.
+#
+# PREREQUISITE:
+# Your cluster MUST use a CNI (Container Network Interface) network plugin that 
+# supports NetworkPolicies (e.g. Calico, Cilium, Weave Net, Kube-router).
+# Note: Flannel does NOT enforce NetworkPolicies on its own!
+#
+# ZERO TRUST SECURITY MODEL:
+# Best practice is to create a "Default Deny All" policy, and then selectively
+# whitelist only required ingress/egress connections.
+#
+# IMPORTANT CLI COMMANDS:
+# - Apply:        kubectl apply -f network-policy.yaml
+# - Get:          kubectl get networkpolicy (or netpol)
+# - Describe:     kubectl describe netpol secure-backend-netpol
+# ==============================================================================
+
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+
+metadata:
+  name: secure-backend-netpol
+  namespace: default
+  labels:
+    tier: security
+
+spec:
+  # ----------------------------------------------------------------------------
+  # Pod Selector: Which pods does this policy apply to?
+  # ----------------------------------------------------------------------------
+  podSelector:
+    matchLabels:
+      app: backend-api
+      tier: api
+
+  # Policy Types: Indicates whether Ingress, Egress, or both rules are enforced.
+  policyTypes:
+    - Ingress
+    - Egress
+
+  # ----------------------------------------------------------------------------
+  # INGRESS RULES: Who is allowed to SEND traffic to the selected pods?
+  # ----------------------------------------------------------------------------
+  ingress:
+    # --- Allow Rule 1: Allow frontend pods in the same namespace ---
+    - from:
+        - podSelector:
+            matchLabels:
+              app: frontend
+      ports:
+        - protocol: TCP
+          port: 8080
+
+    # --- Allow Rule 2: Allow monitoring tools from monitoring namespace ---
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: monitoring
+          podSelector:
+            matchLabels:
+              app: prometheus
+      ports:
+        - protocol: TCP
+          port: 9090
+
+  # ----------------------------------------------------------------------------
+  # EGRESS RULES: Who are the selected pods allowed to SEND traffic OUT to?
+  # ----------------------------------------------------------------------------
+  egress:
+    # --- Allow Rule 1: Allow DNS resolution (Port 53 UDP/TCP to kube-dns) ---
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+          podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+
+    # --- Allow Rule 2: Allow connecting to Postgres Database on port 5432 ---
+    - to:
+        - podSelector:
+            matchLabels:
+              app: database-cluster
+      ports:
+        - protocol: TCP
+          port: 5432
+
+    # --- Allow Rule 3: Allow external API calls to specific IP range ---
+    - to:
+        - ipBlock:
+            cidr: 198.51.100.0/24
+            except:
+              - 198.51.100.10/32
+      ports:
+        - protocol: TCP
+          port: 443
+

@@ -1,0 +1,35 @@
+# ==============================================================================
+# Kubernetes Object: Service (ExternalName)
+# ==============================================================================
+# WHAT IS AN EXTERNALNAME SERVICE?
+# An ExternalName service is a special type of Service that does NOT use selectors
+# and does NOT define any ports or endpoints.
+# Instead, it maps a cluster-internal DNS name to an external DNS CNAME record.
+#
+# WHY USE AN EXTERNALNAME SERVICE?
+# - Abstract external services: E.g., an external database hosted on AWS RDS or
+#   Google Cloud SQL (like `my-db.c7x8y.us-east-1.rds.amazonaws.com`).
+# - Decoupling: In-cluster pods simply connect to `external-database-service`.
+#   If the database moves or changes endpoint, you update only this manifest,
+#   without changing application code or configmaps across 50 pods!
+#
+# IMPORTANT CLI COMMANDS:
+# - Apply:        kubectl apply -f externalname-service.yaml
+# - DNS Test:     kubectl run test --rm -it --image=busybox:1.36 -- nslookup external-database-service
+# ==============================================================================
+
+apiVersion: v1
+kind: Service
+
+metadata:
+  name: external-database-service
+  namespace: default
+  labels:
+    app: external-db-adapter
+
+spec:
+  type: ExternalName
+
+  # The external Fully Qualified Domain Name (FQDN) that will be returned as CNAME
+  externalName: my-cloud-database.region.rds.amazonaws.com
+

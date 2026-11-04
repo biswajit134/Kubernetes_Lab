@@ -1,0 +1,123 @@
+# ==============================================================================
+# Kubernetes Object: Pod Health Probes & Lifecycle Hooks
+# ==============================================================================
+# WHAT ARE HEALTH PROBES?
+# Kubernetes uses probes to determine if a container is healthy, ready to serve 
+# traffic, or needs to be restarted.
+#
+# THREE TYPES OF PROBES:
+# 1. startupProbe:
+#    - Checks if the application inside the container has started up.
+#    - Disables liveness and readiness checks until it succeeds.
+#    - Ideal for legacy or slow-starting applications that take minutes to boot.
+#
+# 2. livenessProbe:
+#    - Checks if the application is still alive and responsive.
+#    - FAILURE ACTION: Container is killed and restarted based on restartPolicy.
+#    - Prevents deadlocked applications from remaining stuck forever.
+#
+# 3. readinessProbe:
+#    - Checks if the container is ready to accept incoming network traffic.
+#    - FAILURE ACTION: The Pod's IP is removed from matching Service endpoints.
+#    - Container is NOT restarted. Used during warm-up or temporary overload.
+#
+# PROBE MECHANISMS:
+# - httpGet    : Sends HTTP GET request (200-399 is considered success).
+# - tcpSocket  : Attempts TCP handshake on a specific port.
+# - exec       : Executes a command inside container (0 exit code is success).
+# - grpc       : Performs a gRPC health check (Kubernetes 1.24+).
+#
+# LIFECYCLE HOOKS:
+# - postStart  : Executes immediately after container creation (asynchronous).
+# - preStop    : Blocking call executed before container termination (graceful shutdown).
+#
+# IMPORTANT CLI COMMANDS:
+# - Apply:        kubectl apply -f pod-lifecycle-probes.yaml
+# - Describe:     kubectl describe pod probe-demo-pod (Look at Events section!)
+# ==============================================================================
+
+apiVersion: v1
+kind: Pod
+
+metadata:
+  name: probe-demo-pod
+  namespace: default
+  labels:
+    app: robust-service
+
+spec:
+  containers:
+    - name: web-service
+      image: nginx:1.25-alpine
+      ports:
+        - name: http
+          containerPort: 80
+
+      # ------------------------------------------------------------------------
+      # 1. STARTUP PROBE: Protects slow-starting apps from being killed prematurely
+      # ------------------------------------------------------------------------
+      startupProbe:
+        httpGet:
+          path: /
+          port: 80
+        # Wait 5 seconds before the very first probe check
+        initialDelaySeconds: 5
+        # Perform check every 5 seconds
+        periodSeconds: 5
+        # If it fails 12 times (12 * 5s = 60s max startup budget), pod is restarted
+        failureThreshold: 12
+        # Number of successes needed to be considered started
+        successThreshold: 1
+        # Seconds after which probe times out
+        timeoutSeconds: 2
+
+      # ------------------------------------------------------------------------
+      # 2. LIVENESS PROBE: Detects application deadlocks & crashes
+      # ------------------------------------------------------------------------
+      livenessProbe:
+        httpGet:
+          path: /
+          port: 80
+        # Checked after startupProbe passes
+        periodSeconds: 10
+        # If 3 consecutive checks fail, Kubelet restarts this container
+        failureThreshold: 3
+        timeoutSeconds: 2
+
+      # ------------------------------------------------------------------------
+      # 3. READINESS PROBE: Controls whether traffic is routed to this Pod
+      # ------------------------------------------------------------------------
+      readinessProbe:
+        httpGet:
+          path: /
+          port: 80
+        periodSeconds: 5
+        # If 2 checks fail, pod is removed from Service endpoint list
+        failureThreshold: 2
+        # Number of consecutive successes required after a failure to re-enable traffic
+        successThreshold: 1
+        timeoutSeconds: 2
+
+      # ------------------------------------------------------------------------
+      # 4. LIFECYCLE HOOKS: Actions triggered by container lifecycle transitions
+      # ------------------------------------------------------------------------
+      lifecycle:
+        # Executes immediately after container is created
+        postStart:
+          exec:
+            command: ["/bin/sh", "-c", "echo 'Container initialized' > /usr/share/nginx/html/status.txt"]
+
+        # Executes before container stops (e.g., during rolling update or deletion)
+        # Allows draining active connections and clean shutdown
+        preStop:
+          exec:
+            command: ["/bin/sh", "-c", "sleep 10"]
+
+      resources:
+        requests:
+          cpu: "100m"
+          memory: "128Mi"
+        limits:
+          cpu: "250m"
+          memory: "256Mi"
+

@@ -1,0 +1,102 @@
+# ==============================================================================
+# Observability Object: GrafanaDashboard (Grafana Operator CRD)
+# ==============================================================================
+# WHAT IS THE GRAFANADASHBOARD CRD?
+# The Grafana Operator allows you to manage Grafana instances, datasources, and 
+# dashboards declaratively using Kubernetes Custom Resources (GitOps approach).
+#
+# WHY USE THIS OVER CLICKING IN THE GRAFANA UI?
+# 1. Dashboards as Code: Dashboards are tracked in Git alongside your microservices.
+# 2. Immutable & Recreatable: If a Grafana cluster dies, all dashboards are automatically
+#    re-imported instantly.
+# 3. Environment Parity: Automatically deploy the same dashboard to dev, staging, and prod.
+# 4. No Manual Import: Eliminates manual copy-pasting of dashboard JSON IDs.
+#
+# HOW IT WORKS:
+# - The Grafana Operator watches for `GrafanaDashboard` CRDs.
+# - It extracts the JSON model (embedded or from a ConfigMap) and uses the Grafana
+#   HTTP API to create or update the dashboard inside Grafana.
+#
+# IMPORTANT CLI COMMANDS:
+# - Apply:        kubectl apply -f grafanadashboard.yaml
+# - Get:          kubectl get grafanadashboards (or gd) -A
+# - Check Status: kubectl get gd cluster-compute-dashboard -o yaml
+# ==============================================================================
+
+apiVersion: grafana.integreatly.org/v1beta1
+kind: GrafanaDashboard
+
+metadata:
+  name: cluster-compute-dashboard
+  namespace: default
+  labels:
+    dashboards: "default"
+    tier: visualization
+
+spec:
+  # Folder inside Grafana where this dashboard should appear
+  folder: "Kubernetes Cluster Overview"
+
+  # Matching label on the target Grafana instance
+  instanceSelector:
+    matchLabels:
+      dashboards: "default"
+
+  # Automatically resync every 10 minutes to prevent dashboard drift
+  resyncPeriod: 10m
+
+  # ----------------------------------------------------------------------------
+  # Dashboard JSON Definition (Embedded inline or sourced from a ConfigMap)
+  # ----------------------------------------------------------------------------
+  json: |
+    {
+      "annotations": { "list": [] },
+      "editable": true,
+      "fiscalYearStartMonth": 0,
+      "graphTooltip": 0,
+      "id": null,
+      "links": [],
+      "liveNow": false,
+      "panels": [
+        {
+          "collapsed": false,
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+          "id": 1,
+          "title": "Cluster CPU Utilization",
+          "type": "timeseries",
+          "targets": [
+            {
+              "datasource": { "type": "prometheus", "uid": "prometheus-default" },
+              "expr": "sum(rate(container_cpu_usage_seconds_total[5m])) by (namespace)",
+              "legendFormat": "{{ namespace }}",
+              "refId": "A"
+            }
+          ]
+        },
+        {
+          "collapsed": false,
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+          "id": 2,
+          "title": "Cluster Memory Usage (Bytes)",
+          "type": "timeseries",
+          "targets": [
+            {
+              "datasource": { "type": "prometheus", "uid": "prometheus-default" },
+              "expr": "sum(container_memory_working_set_bytes) by (namespace)",
+              "legendFormat": "{{ namespace }}",
+              "refId": "B"
+            }
+          ]
+        }
+      ],
+      "refresh": "10s",
+      "schemaVersion": 38,
+      "style": "dark",
+      "tags": ["kubernetes", "compute", "resources"],
+      "time": { "from": "now-1h", "to": "now" },
+      "timepicker": {},
+      "timezone": "browser",
+      "title": "Kubernetes Resource Health",
+      "version": 1
+    }
+

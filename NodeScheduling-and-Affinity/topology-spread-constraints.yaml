@@ -1,0 +1,76 @@
+# ==============================================================================
+# Kubernetes Scheduling: Topology Spread Constraints
+# ==============================================================================
+# WHAT ARE TOPOLOGY SPREAD CONSTRAINTS?
+# Topology Spread Constraints control how Pods are distributed across your cluster 
+# among failure-domains such as regions, zones, nodes, and other user-defined topology domains.
+#
+# WHY USE THIS OVER POD ANTI-AFFINITY?
+# - Pod anti-affinity is binary (either 1 pod per node, or none).
+# - Topology Spread Constraints allow balanced, gradual distribution (e.g. 
+#   distribute 10 pods across 3 zones such that no zone has more than 1 pod difference!).
+#
+# KEY PARAMETERS:
+# - maxSkew: The degree to which pods may be unevenly distributed.
+#   maxSkew = |matching pods in current topology - minimum matching pods across all topologies|
+# - topologyKey: The key of node labels defining topology (e.g., topology.kubernetes.io/zone).
+# - whenUnsatisfiable:
+#   * DoNotSchedule: (Hard rule) Pod stays Pending if skew condition cannot be met.
+#   * ScheduleAnyway: (Soft rule) Scheduler prioritizes balancing skew, but schedules anyway.
+#
+# IMPORTANT CLI COMMANDS:
+# - Apply:        kubectl apply -f topology-spread-constraints.yaml
+# - Verify:       kubectl get pods -o wide --sort-by='.spec.nodeName'
+# ==============================================================================
+
+apiVersion: apps/v1
+kind: Deployment
+
+metadata:
+  name: balanced-microservice
+  namespace: default
+  labels:
+    app: balanced-api
+
+spec:
+  replicas: 6
+  selector:
+    matchLabels:
+      app: balanced-api
+
+  template:
+    metadata:
+      labels:
+        app: balanced-api
+    spec:
+      # ------------------------------------------------------------------------
+      # Topology Spread Constraints
+      # ------------------------------------------------------------------------
+      topologySpreadConstraints:
+        # Constraint 1: Spread evenly across Availability Zones
+        - maxSkew: 1
+          topologyKey: topology.kubernetes.io/zone
+          whenUnsatisfiable: DoNotSchedule
+          labelSelector:
+            matchLabels:
+              app: balanced-api
+
+        # Constraint 2: Spread across individual nodes within each zone
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              app: balanced-api
+
+      containers:
+        - name: app
+          image: nginx:1.25-alpine
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "128Mi"
+            limits:
+              cpu: "200m"
+              memory: "256Mi"
+

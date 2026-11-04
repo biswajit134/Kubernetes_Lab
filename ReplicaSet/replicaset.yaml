@@ -1,0 +1,79 @@
+# ==============================================================================
+# Kubernetes Object: ReplicaSet
+# ==============================================================================
+# WHAT IS A REPLICASET?
+# A ReplicaSet's primary purpose is to maintain a stable set of replica Pods 
+# running at any given time. It guarantees the availability of a specified number 
+# of identical Pods.
+#
+# HOW IT WORKS:
+# - It continuously monitors the cluster state via label selectors.
+# - If there are fewer pods than desired, it creates new ones using the template.
+# - If there are extra pods (e.g., someone manually spun up a matching pod), it terminates them.
+# - If a node hosting a pod dies, the ReplicaSet creates a replacement on another node.
+#
+# NOTE: While ReplicaSets can be used independently, in real-world scenarios you
+# will almost always use a `Deployment` instead. Deployments manage ReplicaSets
+# and provide declarative updates, rollbacks, and pause/resume functionality.
+#
+# IMPORTANT CLI COMMANDS:
+# - Apply:      kubectl apply -f replicaset.yaml
+# - View:       kubectl get rs
+# - Describe:   kubectl describe rs frontend-replicaset
+# - Scale CLI:  kubectl scale rs frontend-replicaset --replicas=5
+# - Delete:     kubectl delete rs frontend-replicaset (also deletes owned pods)
+# - Cascade:    kubectl delete rs frontend-replicaset --cascade=orphan (leaves pods running)
+# ==============================================================================
+
+apiVersion: apps/v1
+kind: ReplicaSet
+
+metadata:
+  name: frontend-replicaset
+  namespace: default
+  labels:
+    app: frontend
+    tier: web
+
+spec:
+  # Desired number of pod instances that must be running
+  replicas: 3
+
+  # ----------------------------------------------------------------------------
+  # Label Selector: Defines how the ReplicaSet finds which Pods to manage
+  # ----------------------------------------------------------------------------
+  selector:
+    # matchLabels: simple equality-based requirement
+    matchLabels:
+      app: frontend
+      tier: web
+    # matchExpressions: set-based requirements (In, NotIn, Exists, DoesNotExist)
+    matchExpressions:
+      - key: environment
+        operator: In
+        values: ["production", "staging"]
+
+  # ----------------------------------------------------------------------------
+  # Pod Template: Defines the specification for Pods to create when scaling up
+  # NOTE: The labels in template.metadata MUST match the selector defined above!
+  # ----------------------------------------------------------------------------
+  template:
+    metadata:
+      labels:
+        app: frontend
+        tier: web
+        environment: production
+    spec:
+      containers:
+        - name: web-server
+          image: nginx:1.25-alpine
+          ports:
+            - containerPort: 80
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "128Mi"
+            limits:
+              cpu: "250m"
+              memory: "256Mi"
+

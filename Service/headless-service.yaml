@@ -1,0 +1,47 @@
+# ==============================================================================
+# Kubernetes Object: Headless Service
+# ==============================================================================
+# WHAT IS A HEADLESS SERVICE?
+# A Headless Service is a Service with `clusterIP: None`.
+#
+# HOW IT DIFFERS FROM A STANDARD SERVICE:
+# - Standard Service: Assigns a single virtual IP (VIP). DNS query for the service
+#   returns the VIP. Kube-proxy load balances traffic to backend pods.
+# - Headless Service: Does NOT allocate a VIP. Kube-proxy does NOT handle these services.
+#   DNS query returns an 'A' record with the direct IP addresses of ALL matching Pods!
+#
+# PRIMARY USE CASES:
+# 1. StatefulSets: Allows pods to address each other directly by DNS name:
+#    <pod-name>.<service-name>.<namespace>.svc.cluster.local
+# 2. Peer Discovery: Systems like Cassandra, Elasticsearch, Kafka, MongoDB, 
+#    and ZooKeeper use headless services to discover cluster members.
+#
+# IMPORTANT CLI COMMANDS:
+# - Apply:        kubectl apply -f headless-service.yaml
+# - DNS Lookup:   kubectl run test --rm -it --image=busybox:1.36 -- nslookup database-headless
+# ==============================================================================
+
+apiVersion: v1
+kind: Service
+
+metadata:
+  # Using a different name from the StatefulSet's embedded headless service
+  # to avoid naming conflict when both are applied in the same namespace.
+  name: postgres-headless
+  namespace: default
+  labels:
+    app: postgres-cluster
+
+spec:
+  # Setting clusterIP to 'None' creates a Headless Service
+  clusterIP: None
+
+  selector:
+    app: postgres-cluster
+
+  ports:
+    - name: tcp-db
+      port: 5432
+      targetPort: 5432
+      protocol: TCP
+

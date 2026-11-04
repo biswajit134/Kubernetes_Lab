@@ -1,0 +1,89 @@
+# ==============================================================================
+# Gateway API Object: GRPCRoute
+# ==============================================================================
+# WHAT IS A GRPCROUTE?
+# A GRPCRoute provides HTTP/2-based routing for gRPC services. Unlike HTTPRoute,
+# which matches on URL paths and HTTP headers, GRPCRoute matches on gRPC-specific
+# attributes: the gRPC Service name and Method name.
+#
+# WHY NOT JUST USE HTTPROUTE FOR gRPC?
+# While gRPC runs over HTTP/2, using GRPCRoute provides:
+# 1. First-class matching on gRPC service and method names.
+# 2. Cleaner semantics for gRPC-native header matching.
+# 3. Better integration with gRPC health checks and reflection.
+#
+# gRPC REQUEST FORMAT:
+# A gRPC request targets: /<package.ServiceName>/<MethodName>
+# Example: /com.example.UserService/GetUser
+#
+# IMPORTANT CLI COMMANDS:
+# - Apply:        kubectl apply -f grpcroute.yaml
+# - Get:          kubectl get grpcroute
+# - Describe:     kubectl describe grpcroute grpc-service-routes
+# ==============================================================================
+
+apiVersion: gateway.networking.k8s.io/v1
+kind: GRPCRoute
+
+metadata:
+  name: grpc-service-routes
+  namespace: default
+  labels:
+    app: grpc-gateway
+    protocol: grpc
+
+spec:
+  # Attach to the Gateway's HTTPS listener
+  parentRefs:
+    - name: main-gateway
+      sectionName: https-listener
+
+  hostnames:
+    - "grpc.example.com"
+
+  # ----------------------------------------------------------------------------
+  # Rules: gRPC-specific matching and routing
+  # ----------------------------------------------------------------------------
+  rules:
+    # --------------------------------------------------------------------------
+    # Rule 1: Route based on gRPC Service name (Exact match)
+    # --------------------------------------------------------------------------
+    - matches:
+        - method:
+            # Match the fully-qualified gRPC service name
+            service: com.example.UserService
+            # Match a specific method within the service
+            method: GetUser
+            # Type can be 'Exact' or 'RegularExpression'
+            type: Exact
+      backendRefs:
+        - name: user-grpc-service
+          port: 50051
+
+    # --------------------------------------------------------------------------
+    # Rule 2: Route all methods of a service (omit 'method' for wildcard)
+    # --------------------------------------------------------------------------
+    - matches:
+        - method:
+            service: com.example.OrderService
+            type: Exact
+      backendRefs:
+        - name: order-grpc-service
+          port: 50051
+
+    # --------------------------------------------------------------------------
+    # Rule 3: Header-based routing for gRPC (e.g., A/B testing)
+    # --------------------------------------------------------------------------
+    - matches:
+        - method:
+            service: com.example.ProductService
+            type: Exact
+          headers:
+            - name: x-feature-flag
+              type: Exact
+              value: "new-catalog"
+      backendRefs:
+        - name: product-grpc-v2
+          port: 50051
+          weight: 100
+

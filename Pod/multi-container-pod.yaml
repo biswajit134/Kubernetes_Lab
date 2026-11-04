@@ -1,0 +1,91 @@
+# ==============================================================================
+# Kubernetes Object: Multi-Container Pod (Sidecar Pattern)
+# ==============================================================================
+# WHAT IS A MULTI-CONTAINER POD?
+# A Pod can host multiple containers that work cooperatively as a single cohesive unit.
+# Common Design Patterns:
+# 1. Sidecar: Augments or enhances the main application (e.g., log shipper, proxy).
+# 2. Ambassador: Proxies communication between the local app and external services.
+# 3. Adapter: Standardizes output (e.g., converts monitoring metrics to Prometheus format).
+#
+# HOW THEY COMMUNICATE:
+# - Network: Both containers share the same network namespace and loopback (localhost).
+#   If Container A listens on port 8080, Container B can reach it at 127.0.0.1:8080.
+# - Storage: Containers can mount the same Volume (e.g., emptyDir) to share files.
+#
+# IMPORTANT CLI COMMANDS:
+# - Apply:        kubectl apply -f multi-container-pod.yaml
+# - Logs of app:  kubectl logs multi-container-demo -c app-container
+# - Logs of side: kubectl logs multi-container-demo -c log-shipper-sidecar
+# - Exec to side: kubectl exec -it multi-container-demo -c log-shipper-sidecar -- /bin/sh
+# ==============================================================================
+
+apiVersion: v1
+kind: Pod
+
+metadata:
+  name: multi-container-demo
+  namespace: default
+  labels:
+    pattern: sidecar
+    app: order-service
+
+spec:
+  # Shared volume mounted into both containers
+  volumes:
+    - name: shared-logs-volume
+      # emptyDir is created when the pod is assigned to a node and lives as long as the pod lives
+      emptyDir: {}
+
+  containers:
+    # --------------------------------------------------------------------------
+    # 1. PRIMARY CONTAINER: The main application producing log files
+    # --------------------------------------------------------------------------
+    - name: app-container
+      image: busybox:1.36
+      # Generates simulated log entries into the shared volume every 2 seconds
+      command: ["/bin/sh", "-c"]
+      args:
+        - >
+          while true; do
+            echo "$(date -u) [INFO] Processing incoming transaction..." >> /var/log/app/transaction.log;
+            sleep 2;
+          done
+      volumeMounts:
+        - name: shared-logs-volume
+          mountPath: /var/log/app
+
+      resources:
+        requests:
+          cpu: "50m"
+          memory: "64Mi"
+        limits:
+          cpu: "100m"
+          memory: "128Mi"
+
+    # --------------------------------------------------------------------------
+    # 2. SIDECAR CONTAINER: Reads logs written by the primary container and ships them
+    # --------------------------------------------------------------------------
+    - name: log-shipper-sidecar
+      image: busybox:1.36
+      # Streams the log file to stdout (simulating a log forwarding agent like FluentBit)
+      command: ["/bin/sh", "-c"]
+      args:
+        - >
+          echo "Sidecar started. Waiting for log file...";
+          until [ -f /var/log/app/transaction.log ]; do sleep 1; done;
+          tail -n +1 -f /var/log/app/transaction.log
+      volumeMounts:
+        - name: shared-logs-volume
+          mountPath: /var/log/app
+          # Sidecar can mount the shared directory as read-only for safety
+          readOnly: true
+
+      resources:
+        requests:
+          cpu: "30m"
+          memory: "32Mi"
+        limits:
+          cpu: "50m"
+          memory: "64Mi"
+

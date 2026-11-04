@@ -1,0 +1,59 @@
+# ==============================================================================
+# Gateway API Object: TLSRoute
+# ==============================================================================
+# WHAT IS A TLSROUTE?
+# A TLSRoute routes encrypted TLS traffic WITHOUT terminating the TLS session
+# at the Gateway (TLS passthrough). The Gateway inspects the SNI (Server Name
+# Indication) field in the TLS ClientHello to decide where to route traffic,
+# but does NOT decrypt it.
+#
+# TLS PASSTHROUGH vs TLS TERMINATION:
+# ┌───────────────────────────────────────────────────────────────────────────┐
+# │  TLS Termination (HTTPS Listener + HTTPRoute):                          │
+# │  Client ──TLS──▶ Gateway decrypts ──HTTP──▶ Backend Service             │
+# │  Gateway holds the TLS certificate and private key.                     │
+# │                                                                         │
+# │  TLS Passthrough (TLS Listener + TLSRoute):                             │
+# │  Client ──TLS──▶ Gateway reads SNI ──TLS──▶ Backend Service             │
+# │  Gateway NEVER sees plaintext. Backend holds the certificate.           │
+# │  Used for end-to-end encryption or backend-managed certificates.        │
+# └───────────────────────────────────────────────────────────────────────────┘
+#
+# IMPORTANT CLI COMMANDS:
+# - Apply:        kubectl apply -f tlsroute.yaml
+# - Get:          kubectl get tlsroute
+# - Describe:     kubectl describe tlsroute secure-passthrough-route
+#
+# NOTE: TLSRoute is part of the "experimental" channel as of Gateway API v1.2.
+# ==============================================================================
+
+apiVersion: gateway.networking.k8s.io/v1alpha2
+kind: TLSRoute
+
+metadata:
+  name: secure-passthrough-route
+  namespace: default
+  labels:
+    app: tls-passthrough
+    protocol: tls
+
+spec:
+  # Attach to a Gateway listener configured with protocol: TLS and mode: Passthrough
+  parentRefs:
+    - name: main-gateway
+      sectionName: tls-passthrough-listener
+
+  # Hostnames are matched against the SNI field in the TLS ClientHello
+  hostnames:
+    - "secure-internal.example.com"
+
+  # ----------------------------------------------------------------------------
+  # Rules: Route based on SNI match
+  # ----------------------------------------------------------------------------
+  rules:
+    # Forward the encrypted TLS stream to the backend without decrypting
+    - backendRefs:
+        - name: secure-backend-service
+          port: 8443
+          weight: 100
+

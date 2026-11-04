@@ -1,0 +1,71 @@
+# ==============================================================================
+# Kubernetes Object: APIService (API Aggregator Registration for metrics.k8s.io)
+# ==============================================================================
+# WHAT IS AN APISERVICE?
+# In Kubernetes, there are two ways to extend the API:
+# 1. CustomResourceDefinitions (CRDs): Handled directly by `kube-apiserver` and 
+#    persisted into `etcd`.
+# 2. Aggregated APIs (`APIService` in `apiregistration.k8s.io/v1`): Proxied dynamically
+#    to an in-cluster extension API server (like Metrics Server).
+#
+# WHY METRICS SERVER USES APISERVICE INSTEAD OF CRD:
+# Resource metrics (CPU and Memory per second) are fast-moving, high-frequency,
+# in-memory data. Storing millions of metric datapoints per minute directly into 
+# `etcd` via standard CRDs would overload and destroy `etcd` performance!
+#
+# Instead, the `APIService` tells `kube-apiserver`:
+# "Whenever a client or HPA asks for `/apis/metrics.k8s.io/v1beta1`, do not look 
+# in etcd. Forward the request directly to the `metrics-server` pod via its Service!"
+#
+# HOW CLIENTS CONSUME IT:
+# - `kubectl top nodes` -> calls `GET /apis/metrics.k8s.io/v1beta1/nodes`
+# - `kubectl top pods`  -> calls `GET /apis/metrics.k8s.io/v1beta1/pods`
+# - HPA Controller      -> polls `/apis/metrics.k8s.io/v1beta1/namespaces/<ns>/pods`
+#
+# IMPORTANT CLI COMMANDS:
+# - Apply:             kubectl apply -f metrics-apiservice.yaml
+# - Get APIServices:   kubectl get apiservice
+# - Check Condition:   kubectl get apiservice v1beta1.metrics.k8s.io -o jsonpath='{.status.conditions[0]}'
+#                      (Must show status: "True" and reason: "Passed")
+# - Raw Metric Query:  kubectl get --raw /apis/metrics.k8s.io/v1beta1/nodes
+# ==============================================================================
+
+apiVersion: apiregistration.k8s.io/v1
+kind: APIService
+
+metadata:
+  # The name MUST follow the format: <version>.<group>
+  name: v1beta1.metrics.k8s.io
+  labels:
+    kubernetes.io/cluster-service: "true"
+    app.kubernetes.io/name: metrics-server
+    tier: observability
+
+spec:
+  # ----------------------------------------------------------------------------
+  # Group & Version
+  # ----------------------------------------------------------------------------
+  group: metrics.k8s.io
+  version: v1beta1
+
+  # Priority ordering used by the main API server when aggregating discovery docs
+  groupPriorityMinimum: 100
+  versionPriority: 100
+
+  # ----------------------------------------------------------------------------
+  # Backend Extension Service: Where to forward incoming requests
+  # ----------------------------------------------------------------------------
+  service:
+    name: metrics-server
+    namespace: kube-system
+    port: 443 # Port exposed on the ClusterIP Service
+
+  # ----------------------------------------------------------------------------
+  # TLS Authentication between kube-apiserver and metrics-server
+  # ----------------------------------------------------------------------------
+  # Option A (Lab / Sandbox): Skip TLS verification when using self-signed certs:
+  insecureSkipTLSVerify: true
+
+  # Option B (Production Hardened): Supply the base64-encoded CA certificate:
+  # caBundle: LS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0tLS0tCg==
+

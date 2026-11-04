@@ -1,0 +1,77 @@
+# ==============================================================================
+# Kubernetes Object: ConfigMap
+# ==============================================================================
+# WHAT IS A CONFIGMAP?
+# A ConfigMap is an API object used to store non-confidential data in key-value pairs.
+# Pods can consume ConfigMaps as environment variables, command-line arguments, 
+# or as configuration files in a Volume.
+#
+# WHY USE A CONFIGMAP?
+# - Decouples environment-specific configuration from container images.
+# - Promotes application portability across dev, test, and prod without rebuilding images.
+# - Can store both individual scalar values and entire configuration files.
+#
+# CONSUMPTION METHODS:
+# 1. Environment variable via valueFrom.configMapKeyRef.
+# 2. Entire ConfigMap injected as environment variables via envFrom.
+# 3. Mounted as files into a directory via volumes.configMap.
+#
+# IMPORTANT CLI COMMANDS:
+# - Apply:             kubectl apply -f configmap.yaml
+# - Get:               kubectl get configmap (or cm)
+# - View raw content:  kubectl get cm app-config -o yaml
+# - Create from file:  kubectl create configmap app-cfg --from-file=app.properties
+# ==============================================================================
+
+apiVersion: v1
+kind: ConfigMap
+
+metadata:
+  name: app-config
+  namespace: default
+  labels:
+    app: inventory-api
+    environment: production
+
+# 'immutable: true' protects against accidental edits and improves cluster performance
+# by reducing watches on the API server (Kubernetes 1.21+)
+immutable: false
+
+data:
+  # ----------------------------------------------------------------------------
+  # 1. Individual Scalar Key-Value Pairs
+  # ----------------------------------------------------------------------------
+  APP_ENV: "production"
+  LOG_LEVEL: "info"
+  PORT: "8080"
+  MAX_CONNECTIONS: "100"
+  FEATURE_TOGGLE_DARK_MODE: "true"
+
+  # ----------------------------------------------------------------------------
+  # 2. Entire Configuration Files Embedded via YAML Multi-line Strings (|)
+  # ----------------------------------------------------------------------------
+  app-settings.json: |
+    {
+      "database": {
+        "poolSize": 20,
+        "timeoutMs": 5000,
+        "retryAttempts": 3
+      },
+      "cache": {
+        "enabled": true,
+        "ttlSeconds": 3600
+      }
+    }
+
+  nginx.conf: |
+    events { worker_connections 1024; }
+    http {
+      server {
+        listen 8080;
+        location / {
+          return 200 '{"status":"ok","source":"configmap-nginx"}';
+          add_header Content-Type application/json;
+        }
+      }
+    }
+
