@@ -380,6 +380,22 @@ flowchart LR
   - **`kubernetes.io/tls`**: Structured secret requiring `tls.crt` and `tls.key` for HTTPS termination on Ingress or Gateways.
 * **🌐 Official Manual:** [Kubernetes Secrets](https://kubernetes.io/docs/concepts/configuration/secret/)
 
+### External Secrets Operator (SecretStore & ExternalSecret)
+* **🟢 What:** Kubernetes operator that integrates external secret management systems (AWS Secrets Manager, HashiCorp Vault, GCP Secret Manager, Azure Key Vault) directly into the Kubernetes cluster.
+* **🟡 Why:** **The Enterprise GitOps Standard**: Committing raw Secret manifests (even Base64) to Git violates SOC2 and ISO 27001 compliance. ESO allows developers to commit purely declarative `ExternalSecret` manifests to Git while actual credentials reside securely in cloud vaults and are injected dynamically into etcd.
+* **🔵 How:**
+  - `SecretStore` authenticates via cloud IAM Workload Identity (AWS IRSA / GCP Workload Identity) without static API keys.
+  - `ExternalSecret` defines which remote keys to pull and how to synthesize the resulting native Kubernetes `Secret`. It continuously polls and auto-rotates credentials when DBAs rotate passwords in the vault!
+* **🌐 Official Manual:** [External Secrets Operator Documentation](https://external-secrets.io/)
+
+### Cert-Manager (ClusterIssuer & Certificate)
+* **🟢 What:** Cloud-native automated X.509 certificate management controller for Kubernetes.
+* **🟡 Why:** Manual SSL certificate management causes severe outages when certificates inevitably expire. Cert-manager automates ordering, issuing, validating, and renewing TLS certificates from public (Let's Encrypt) and private (Vault, internal CA) issuers.
+* **🔵 How:**
+  - `ClusterIssuer` configures ACME challenge solvers (HTTP-01 via Ingress or DNS-01 via Route53/Cloudflare).
+  - `Certificate` custom resource requests certificates for specific domain SANs and writes the resulting public cert and private key into a native `kubernetes.io/tls` Secret. It automatically renews certificates 30 days before the 90-day expiration window!
+* **🌐 Official Manual:** [Cert-Manager Documentation](https://cert-manager.io/docs/)
+
 ---
 
 ## 6. Services & Core Networking
@@ -521,7 +537,7 @@ flowchart LR
     end
 
     subgraph Bindings["Role Bindings"]
-        RB["RoleBinding: read-pods-binding\n(Namespace: default)"]
+        RB["RoleBinding: read-pods-binding\n(Namespace: production)"]
         CRB["ClusterRoleBinding: cluster-admin-binding\n(Cluster-Wide)"]
     end
 

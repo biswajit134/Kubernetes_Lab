@@ -37,7 +37,7 @@ kind: Service
 
 metadata:
   name: backend-service
-  namespace: default
+  namespace: production
   labels:
     app: backend-api
     tier: api

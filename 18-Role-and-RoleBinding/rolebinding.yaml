@@ -21,7 +21,7 @@ kind: RoleBinding
 
 metadata:
   name: read-pods-binding
-  namespace: default
+  namespace: production
   labels:
     tier: rbac-security
 
@@ -32,8 +32,7 @@ subjects:
   # Subject 1: A specific ServiceAccount running in this namespace
   - kind: ServiceAccount
     name: app-service-account
-    namespace: default
-
+    namespace: production
   # Subject 2: A specific human user
   - kind: User
     name: developer-bob

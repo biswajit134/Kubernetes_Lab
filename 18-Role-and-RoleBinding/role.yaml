@@ -25,7 +25,7 @@ kind: Role
 
 metadata:
   name: pod-reader-role
-  namespace: default
+  namespace: production
   labels:
     tier: rbac-security
 

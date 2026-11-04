@@ -1,52 +1,67 @@
 # ==============================================================================
-# Kubernetes Object: Namespace
+# Kubernetes Object: Namespace (Production Multi-Tenancy Architecture)
 # ==============================================================================
 # WHAT IS A NAMESPACE?
 # A Namespace provides a virtual cluster mechanism to divide cluster resources 
 # between multiple users, teams, or environments (e.g., dev, staging, prod).
 #
-# KEY CHARACTERISTICS:
-# - Scope for Names: Object names must be unique within a namespace, but can be
-#   reused across different namespaces.
-# - Resource Quotas: Divide total cluster CPU/Memory/Storage among teams.
-# - Network Isolation: Used as targets for NetworkPolicies.
-# - Default Namespaces:
-#   * default     : Default workspace for objects when no namespace is specified.
-#   * kube-system : Reserved for core Kubernetes system components.
-#   * kube-public : Readable by all users (mostly used for cluster info).
-#   * kube-node-lease: Holds Lease objects for node heartbeats.
+# WHY AVOID THE 'default' NAMESPACE IN PRODUCTION:
+# 1. Zero Isolation: All workloads in 'default' share unpartitioned compute and network.
+# 2. Security Non-Compliance: Cannot enforce strict Pod Security Admission (PSA)
+#    on 'default' without breaking legacy and system pods.
+# 3. Accidental Overwrites: Name collisions easily lead to accidental deletions.
+# 4. RBAC Auditing: Cannot grant least-privilege RBAC roles to specific teams.
+#
+# PRODUCTION MULTI-TENANCY STANDARD:
+# - Production workloads run in isolated namespaces (e.g., 'production').
+# - Pod Security Standards (PSA) are enforced at the 'restricted' level (CIS Benchmark).
 #
 # IMPORTANT CLI COMMANDS:
 # - Create:   kubectl apply -f namespace.yaml
 # - List:     kubectl get namespaces (or kubectl get ns)
-# - Inspect:  kubectl describe ns development
-# - Switch:   kubectl config set-context --current --namespace=development
-# - Delete:   kubectl delete -f namespace.yaml (CAUTION: Deletes ALL resources inside!)
+# - Inspect:  kubectl describe ns production
+# - Switch:   kubectl config set-context --current --namespace=production
 # ==============================================================================
 
 apiVersion: v1
 kind: Namespace
 
 metadata:
-  # The unique name of the namespace across the entire cluster.
-  # Must consist of lower-case alphanumeric characters or '-', and start/end with an alphanumeric.
-  name: development
-
-  # Labels are key/value pairs attached to objects for organization and selection.
+  # Dedicated Production Namespace
+  name: production
   labels:
-    # Common labels for environmental and organizational tracking
-    environment: dev
+    environment: production
     team: backend
     project: ecommerce
     
-    # Pod Security Admission (PSA) label (Kubernetes 1.23+)
-    # Levels: privileged, baseline, restricted
-    # Modes: enforce, audit, warn
+    # --------------------------------------------------------------------------
+    # Production Pod Security Standards (PSA) - Strictly Enforced!
+    # --------------------------------------------------------------------------
+    pod-security.kubernetes.io/enforce: restricted
+    pod-security.kubernetes.io/enforce-version: latest
+    pod-security.kubernetes.io/audit: restricted
+    pod-security.kubernetes.io/warn: restricted
+
+  annotations:
+    description: "Hardened production namespace for customer-facing workloads."
+    contact: "sre-team@company.internal"
+
+---
+# ------------------------------------------------------------------------------
+# Development Sandbox Namespace (Baseline Security for Testing)
+# ------------------------------------------------------------------------------
+apiVersion: v1
+kind: Namespace
+
+metadata:
+  name: development
+  labels:
+    environment: dev
+    team: backend
+    project: ecommerce
     pod-security.kubernetes.io/enforce: baseline
     pod-security.kubernetes.io/enforce-version: latest
 
-  # Annotations store non-identifying metadata, audit info, or tool configurations.
   annotations:
     description: "Sandbox namespace for backend development and integration testing."
-    owner: "dev-team@company.internal"
-
+    contact: "dev-team@company.internal"

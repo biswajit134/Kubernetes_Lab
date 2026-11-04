@@ -26,7 +26,7 @@ kind: HorizontalPodAutoscaler
 
 metadata:
   name: web-app-hpa
-  namespace: default
+  namespace: production
   labels:
     app: web-store
     tier: autoscaling

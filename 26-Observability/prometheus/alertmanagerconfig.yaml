@@ -26,7 +26,7 @@ kind: AlertmanagerConfig
 
 metadata:
   name: backend-team-alerts
-  namespace: default
+  namespace: monitoring
   labels:
     alertmanagerConfig: backend-team
 

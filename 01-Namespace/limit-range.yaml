@@ -1,30 +1,24 @@
 # ==============================================================================
-# Kubernetes Object: LimitRange
+# Kubernetes Object: LimitRange (Production Container Sizing Policy)
 # ==============================================================================
 # WHAT IS A LIMITRANGE?
 # A LimitRange sets default, minimum, and maximum resource constraints for 
 # individual Pods and Containers within a namespace. 
 #
-# WHY USE IT?
-# - Automatically injects default CPU/Memory requests & limits if a pod omits them.
-# - Prevents developers from launching pods with microscopic (starving) or huge
-#   (hogging) resource requests.
-# - Works hand-in-hand with ResourceQuota.
-#
 # IMPORTANT CLI COMMANDS:
 # - Apply:    kubectl apply -f limit-range.yaml
-# - View:     kubectl get limitrange -n development
-# - Inspect:  kubectl describe limitrange dev-limit-range -n development
+# - View:     kubectl get limitrange -n production
+# - Inspect:  kubectl describe limitrange prod-limit-range -n production
 # ==============================================================================
 
 apiVersion: v1
 kind: LimitRange
 
 metadata:
-  name: dev-limit-range
-  namespace: development
+  name: prod-limit-range
+  namespace: production
   labels:
-    environment: dev
+    environment: production
 
 spec:
   limits:
@@ -33,45 +27,44 @@ spec:
     # --------------------------------------------------------------------------
     - type: Container
 
-      # 'default' specifies the DEFAULT LIMIT injected if the developer omits it
+      # Default limits injected if omitted by developer
       default:
         cpu: "500m"         # 0.5 CPU core
         memory: "512Mi"     # 512 Megabytes
 
-      # 'defaultRequest' specifies the DEFAULT REQUEST injected if omitted
+      # Default requests injected if omitted
       defaultRequest:
         cpu: "100m"         # 0.1 CPU core
         memory: "128Mi"     # 128 Megabytes
 
-      # 'max' defines the UPPER BOUND allowed for any container
+      # Upper bounds for any single container
       max:
-        cpu: "2"            # Max 2 CPU cores per container
-        memory: "2Gi"       # Max 2 GiB memory per container
+        cpu: "4"            # Max 4 CPU cores
+        memory: "8Gi"       # Max 8 GiB memory
 
-      # 'min' defines the LOWER BOUND allowed for any container
+      # Lower bounds for any single container
       min:
         cpu: "50m"          # Min 0.05 CPU core
         memory: "64Mi"      # Min 64 Megabytes
 
-      # Max limit-to-request ratio (prevents overcommitting beyond a ratio)
+      # Max limit-to-request ratio (prevents extreme overcommit)
       maxLimitRequestRatio:
-        cpu: "4"            # Limit cannot be more than 4x the Request
-        memory: "2"         # Limit cannot be more than 2x the Request
+        cpu: "4"
+        memory: "2"
 
     # --------------------------------------------------------------------------
-    # 2. Pod-level constraints (aggregate sum of all containers in a single pod)
+    # 2. Pod-level aggregate constraints
     # --------------------------------------------------------------------------
     - type: Pod
       max:
-        cpu: "3"
-        memory: "3Gi"
+        cpu: "8"
+        memory: "16Gi"
 
     # --------------------------------------------------------------------------
     # 3. PersistentVolumeClaim constraints
     # --------------------------------------------------------------------------
     - type: PersistentVolumeClaim
       min:
-        storage: "1Gi"      # PVC cannot ask for less than 1Gi
+        storage: "1Gi"
       max:
-        storage: "20Gi"     # PVC cannot ask for more than 20Gi
-
+        storage: "100Gi"

@@ -129,6 +129,11 @@ You need a Kubernetes cluster to run and practice the manifests in this lab. Cho
 * **Description:** Enforce cluster-wide governance and security policies (e.g. "disallow root containers", "require resource limits on all pods", "block images from untrusted registries") at admission time.
 * **Official URL:** [kyverno.io](https://kyverno.io/) / [open-policy-agent.org](https://www.openpolicyagent.org/)
 
+### `External Secrets Operator (ESO)`
+* **What it is:** Production GitOps secret synchronization operator.
+* **Description:** Securely syncs secrets from external enterprise vaults (AWS Secrets Manager, HashiCorp Vault, Google Secret Manager, Azure Key Vault) directly into native Kubernetes Secrets using IAM Workload Identity without committing sensitive credentials to Git.
+* **Official URL:** [external-secrets.io](https://external-secrets.io/)
+
 ---
 
 ## 7. Networking, Ingress, Gateway API & Service Mesh

@@ -28,7 +28,7 @@ kind: ConfigMap
 
 metadata:
   name: app-config
-  namespace: default
+  namespace: production
   labels:
     app: inventory-api
     environment: production

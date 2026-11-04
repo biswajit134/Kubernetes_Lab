@@ -28,7 +28,7 @@ kind: NetworkPolicy
 
 metadata:
   name: secure-backend-netpol
-  namespace: default
+  namespace: production
   labels:
     tier: security
 

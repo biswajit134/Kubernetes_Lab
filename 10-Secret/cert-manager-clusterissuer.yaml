@@ -1,0 +1,70 @@
+# ==============================================================================
+# TLS & Certificate Automation: ClusterIssuer (Cert-Manager CRD)
+# ==============================================================================
+# WHAT IS CERT-MANAGER?
+# cert-manager is the CNCF industry-standard tool for automating the management
+# and issuance of TLS/SSL certificates in Kubernetes clusters.
+#
+# WHAT IS A CLUSTERISSUER?
+# A `ClusterIssuer` is a cluster-scoped resource that defines WHICH Certificate 
+# Authority (CA) should issue certificates and HOW domain ownership is validated.
+#
+# COMMON PRODUCTION ISSUERS:
+# 1. Let's Encrypt Production (Free, trusted public ACME CA, 90-day validity).
+# 2. HashiCorp Vault (Private enterprise PKI).
+# 3. DigiCert / Venafi (Commercial enterprise CA).
+# 4. In-cluster CA (Internal microservice mTLS).
+#
+# ACME CHALLENGE TYPES:
+# - HTTP-01 Challenge: Solved via Ingress by spinning up a temporary routing pod
+#   that serves a cryptographic token on `http://<domain>/.well-known/acme-challenge/`.
+# - DNS-01 Challenge: Solved by adding a TXT record via DNS provider API (AWS Route53,
+#   Cloudflare, Google Cloud DNS). Required for wildcard certificates (`*.example.com`).
+#
+# IMPORTANT CLI COMMANDS:
+# - Apply:             kubectl apply -f cert-manager-clusterissuer.yaml
+# - Get ClusterIssuers:kubectl get clusterissuer
+# - Check Readiness:   kubectl describe clusterissuer letsencrypt-production
+#                      (Look for: Status: True, Reason: ACMEAccountRegistered)
+# ==============================================================================
+
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+
+metadata:
+  name: letsencrypt-production
+  labels:
+    tier: security-pki
+    environment: production
+
+spec:
+  acme:
+    # Official Let's Encrypt Production ACME v2 Server endpoint
+    server: https://acme-v02.api.letsencrypt.org/directory
+
+    # Email address used for ACME certificate expiration and security notifications
+    email: devops-alerts@mycompany.com
+
+    # Name of a Secret used to store the ACME account private key
+    privateKeySecretRef:
+      name: letsencrypt-production-account-key
+
+    # --------------------------------------------------------------------------
+    # Automated Solvers: Proving domain ownership
+    # --------------------------------------------------------------------------
+    solvers:
+      # --- Solver 1: HTTP-01 Challenge via Ingress-NGINX (Public Endpoints) ---
+      - http01:
+          ingress:
+            class: nginx
+
+      # --- Solver 2 (Alternative): DNS-01 Challenge for Wildcard Domains (*.example.com) ---
+      # - dns01:
+      #     route53:
+      #       region: us-east-1
+      #       hostedZoneID: Z148QZ4EXAMPLE
+      #       auth:
+      #         kubernetes:
+      #           serviceAccountRef:
+      #             name: cert-manager-irsa-sa
+

@@ -21,7 +21,7 @@ kind: Database
 
 metadata:
   name: production-postgres
-  namespace: default
+  namespace: production
   labels:
     tier: database
     environment: production

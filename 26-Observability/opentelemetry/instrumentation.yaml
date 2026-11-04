@@ -30,14 +30,14 @@ kind: Instrumentation
 
 metadata:
   name: auto-instrumentation
-  namespace: default
+  namespace: production
   labels:
     tier: observability
 
 spec:
   # OTLP endpoint where auto-instrumented SDKs should export traces & metrics
   exporter:
-    endpoint: "http://otel-collector.default.svc.cluster.local:4318"
+    endpoint: "http://otel-collector.monitoring.svc.cluster.local:4318"
 
   # ----------------------------------------------------------------------------
   # Language Runtimes: SDK Configurations

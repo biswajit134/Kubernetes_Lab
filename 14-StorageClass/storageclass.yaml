@@ -1,27 +1,28 @@
 # ==============================================================================
-# Kubernetes Object: StorageClass
+# Kubernetes Object: StorageClass (Production Cloud CSI)
 # ==============================================================================
 # WHAT IS A STORAGECLASS?
 # A StorageClass provides a way for administrators to describe the "classes" of 
 # storage they offer (e.g. "fast" SSDs, "standard" HDDs, backup storage).
 #
-# DYNAMIC PROVISIONING:
-# Without StorageClasses, cluster admins had to manually create PersistentVolumes
-# upfront (static provisioning). With a StorageClass, when a user requests a 
-# PersistentVolumeClaim, the StorageClass dynamically talks to the underlying cloud
-# or storage backend (AWS EBS, GCP PD, Azure Disk, Ceph, NFS) to create the physical 
-# storage volume on demand!
+# PRODUCTION CLOUD CSI PROVISIONING:
+# In enterprise production, StorageClasses delegate volume lifecycle operations
+# to Container Storage Interface (CSI) drivers provided by your cloud provider.
 #
-# KEY FIELDS:
-# - provisioner: The volume plugin used for provisioning (e.g., ebs.csi.aws.com,
-#   pd.csi.storage.gke.io, disk.csi.azure.com).
-# - volumeBindingMode:
-#   * Immediate (Default): Allocates volume immediately when PVC is created.
-#   * WaitForFirstConsumer: Delays volume creation until a Pod using the PVC is 
-#     scheduled. Ensures the storage disk is created in the SAME AZ/zone as the pod!
-# - reclaimPolicy:
-#   * Delete (Default): Deletes the underlying cloud disk when PVC is deleted.
-#   * Retain: Keeps the physical disk even if the PVC is deleted (data preservation).
+# SUPPORTED CLOUD CSI DRIVERS:
+# - AWS EKS:           ebs.csi.aws.com   (gp3, io2, st1) or efs.csi.aws.com (RWX)
+# - Google Cloud GKE:  pd.csi.storage.gke.io (pd-ssd, pd-balanced, pd-standard)
+# - Azure AKS:         disk.csi.azure.com (Premium_LRS, StandardSSD_LRS)
+# - On-Prem / Hybrid:  rook-ceph.rbd.csi.ceph.com, driver.longhorn.io
+#
+# KEY PRODUCTION POLICIES:
+# 1. volumeBindingMode: WaitForFirstConsumer
+#    CRITICAL: Delays cloud disk provisioning until the pod is scheduled on a node.
+#    This guarantees the disk is created in the SAME Availability Zone as the pod!
+# 2. allowVolumeExpansion: true
+#    Allows resizing PVC storage dynamically (e.g., 20Gi -> 50Gi) without downtime.
+# 3. reclaimPolicy: Delete
+#    Automatically deletes the underlying cloud disk when the PVC is deleted.
 #
 # IMPORTANT CLI COMMANDS:
 # - Apply:        kubectl apply -f storageclass.yaml
@@ -35,34 +36,31 @@ kind: StorageClass
 metadata:
   name: fast-ssd-storage
   annotations:
-    # Set this StorageClass as the cluster default:
-    storageclass.kubernetes.io/is-default-class: "false"
+    # Set this StorageClass as the default provisioner for the cluster
+    storageclass.kubernetes.io/is-default-class: "true"
   labels:
-    tier: high-performance
+    tier: production-storage
+    environment: production
 
-# The CSI driver provisioner plugin responsible for creating volumes
-# For local/lab environments:   kubernetes.io/no-provisioner
-# For AWS EBS (production):     ebs.csi.aws.com
-# For GCP Persistent Disk:      pd.csi.storage.gke.io
-# For Azure Disk:               disk.csi.azure.com
-provisioner: kubernetes.io/no-provisioner
+# Production CSI Driver plugin (AWS EBS CSI driver)
+# For GKE, change to: pd.csi.storage.gke.io
+# For AKS, change to: disk.csi.azure.com
+provisioner: ebs.csi.aws.com
 
-# Reclaim policy applied to dynamically created PersistentVolumes
+# Reclaim policy: Delete the underlying cloud volume when PVC is deleted
 reclaimPolicy: Delete
 
-# Allows resizing the volume dynamically by editing the PVC request.storage field
+# Allows dynamic PVC volume expansion
 allowVolumeExpansion: true
 
-# WaitForFirstConsumer prevents multi-zone mismatch bugs!
+# WaitForFirstConsumer prevents multi-zone placement mismatch errors
 volumeBindingMode: WaitForFirstConsumer
 
 # ------------------------------------------------------------------------------
-# Driver-specific parameters (ONLY used by cloud CSI provisioners, NOT no-provisioner!)
-# Uncomment and change provisioner to a cloud CSI driver to use these.
+# Production Driver Parameters (AWS EBS gp3 volume configuration)
 # ------------------------------------------------------------------------------
-# parameters:
-#   type: gp3                  # AWS EBS volume type (gp3, gp2, io2, st1, sc1)
-#   iops: "3000"               # Provisioned IOPS (gp3/io2 only)
-#   throughput: "125"           # Provisioned throughput in MiB/s (gp3 only)
-#   encrypted: "true"          # Enable encryption at rest
-
+parameters:
+  type: gp3                    # Next-generation SSD with baseline 3,000 IOPS
+  iops: "3000"                 # Provisioned IOPS
+  throughput: "125"            # Provisioned throughput in MiB/s
+  encrypted: "true"            # Enforce hardware encryption at rest via AWS KMS

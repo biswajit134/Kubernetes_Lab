@@ -23,7 +23,7 @@ kind: Deployment
 
 metadata:
   name: legacy-app-deployment
-  namespace: default
+  namespace: production
   labels:
     app: legacy-data-worker
 

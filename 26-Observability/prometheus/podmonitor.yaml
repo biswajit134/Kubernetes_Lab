@@ -22,7 +22,7 @@ kind: PodMonitor
 
 metadata:
   name: agent-pod-monitor
-  namespace: default
+  namespace: monitoring
   labels:
     release: prometheus-stack
     tier: monitoring
@@ -41,7 +41,7 @@ spec:
   # ----------------------------------------------------------------------------
   namespaceSelector:
     matchNames:
-      - default
+      - production
 
   # ----------------------------------------------------------------------------
   # PodMetricsEndpoints: Container ports to scrape directly

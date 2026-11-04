@@ -20,7 +20,7 @@ kind: Pod
 
 metadata:
   name: pod-configmap-consumer
-  namespace: default
+  namespace: production
   labels:
     app: inventory-api
 

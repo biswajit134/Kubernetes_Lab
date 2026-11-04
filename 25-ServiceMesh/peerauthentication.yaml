@@ -31,7 +31,7 @@ kind: PeerAuthentication
 
 metadata:
   name: default-strict-mtls
-  namespace: default
+  namespace: production
   labels:
     tier: security-compliance
 

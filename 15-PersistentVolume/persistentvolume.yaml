@@ -1,64 +1,78 @@
 # ==============================================================================
-# Kubernetes Object: PersistentVolume (PV)
+# Kubernetes Object: PersistentVolume (Production Cloud CSI)
 # ==============================================================================
 # WHAT IS A PERSISTENTVOLUME?
 # A PersistentVolume (PV) is a piece of storage in the cluster that has been 
-# provisioned by an administrator or dynamically provisioned using Storage Classes.
+# provisioned dynamically via a StorageClass or statically mapped to an existing
+# cloud disk by a cluster administrator.
 #
-# KEY CHARACTERISTICS:
-# - Cluster-Scoped: PVs do NOT belong to any namespace (they are cluster-wide).
-# - Independent Lifecycle: A PV's lifecycle is completely independent of any 
-#   individual Pod that uses it. Even if all Pods die, the data remains intact.
+# WHY AVOID hostPath IN PRODUCTION:
+# In local sandboxes, `hostPath` is used because no cloud provider exists.
+# In PRODUCTION, `hostPath` is an anti-pattern: it ties your data to a single 
+# physical node. If that node reboots, crashes, or scales down, your data is lost.
+#
+# PRODUCTION CLOUD CSI BINDING:
+# Production PVs use the CSI driver (`ebs.csi.aws.com`) and reference an actual 
+# cloud volume handle (`vol-0a1b2c3d4e5f67890`) with node affinity for multi-zone
+# resilience.
 #
 # ACCESS MODES:
-# - ReadWriteOnce (RWO): Mounted as read-write by a SINGLE node.
-# - ReadOnlyMany  (ROX): Mounted as read-only by MANY nodes simultaneously.
-# - ReadWriteMany (RWX): Mounted as read-write by MANY nodes (requires NFS/GlusterFS/CephFS).
-# - ReadWriteOncePod (RWOP): Mounted as read-write by a SINGLE POD only (Kubernetes 1.22+).
-#
-# RECLAIM POLICIES:
-# - Retain: When PVC is deleted, PV remains in 'Released' state; data is preserved.
-# - Delete: Underlying storage asset (e.g. cloud disk) is deleted automatically.
-# - Recycle (Deprecated): Performs basic scrub (rm -rf /thevolume/*).
+# - ReadWriteOnce (RWO): Mounted as read-write by a single node (standard for EBS/PD).
+# - ReadOnlyMany  (ROX): Mounted as read-only by multiple nodes simultaneously.
+# - ReadWriteMany (RWX): Mounted by multiple nodes (requires AWS EFS, GCP Filestore, NFS).
 #
 # IMPORTANT CLI COMMANDS:
 # - Apply:        kubectl apply -f persistentvolume.yaml
 # - Get PVs:      kubectl get pv
-# - Describe:     kubectl describe pv local-data-pv
+# - Describe:     kubectl describe pv cloud-ebs-pv
 # ==============================================================================
 
 apiVersion: v1
 kind: PersistentVolume
 
 metadata:
-  name: local-data-pv
+  name: cloud-ebs-pv
   labels:
-    type: local-storage
-    environment: lab
+    tier: production-storage
+    environment: production
 
 spec:
-  # Capacity allocated for this volume
+  # Capacity allocated to match the cloud disk size
   capacity:
-    storage: 10Gi
+    storage: 50Gi
 
-  # Volume mode: Filesystem (default) or Block
   volumeMode: Filesystem
 
-  # Access Modes supported by this volume
   accessModes:
     - ReadWriteOnce
 
-  # Reclaim policy when PVC is deleted
+  # Reclaim policy: 'Retain' keeps the physical cloud volume even if PVC is deleted
   persistentVolumeReclaimPolicy: Retain
 
-  # Associated StorageClass (can be empty string for manual binding)
-  storageClassName: manual-storage
+  # Bound to the production StorageClass
+  storageClassName: fast-ssd-storage
 
   # ----------------------------------------------------------------------------
-  # Underlying Volume Source (Example using hostPath for local lab / Minikube)
-  # In production, this would be an NFS share, CSI volume, or cloud disk.
+  # Production CSI Driver Specification (AWS EBS CSI Plugin)
   # ----------------------------------------------------------------------------
-  hostPath:
-    path: /mnt/data
-    type: DirectoryOrCreate
+  csi:
+    driver: ebs.csi.aws.com
+    # Unique volume ID of the cloud disk (e.g. AWS EBS Volume ID)
+    volumeHandle: vol-0a1b2c3d4e5f67890
+    fsType: ext4
+    volumeAttributes:
+      encrypted: "true"
 
+  # ----------------------------------------------------------------------------
+  # Node Affinity: Constrains volume attachment to the specific cloud zone(s)
+  # where the physical disk was created
+  # ----------------------------------------------------------------------------
+  nodeAffinity:
+    required:
+      nodeSelectorTerms:
+        - matchExpressions:
+            - key: topology.ebs.csi.aws.com/zone
+              operator: In
+              values:
+                - us-east-1a
+                - us-east-1b

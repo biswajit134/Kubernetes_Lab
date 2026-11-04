@@ -27,7 +27,7 @@ kind: ServiceMonitor
 
 metadata:
   name: backend-api-monitor
-  namespace: default
+  namespace: monitoring
   labels:
     # This label is critical: The Prometheus custom resource defines a
     # 'serviceMonitorSelector' that looks for specific labels (e.g., release: prometheus)
@@ -48,7 +48,7 @@ spec:
   namespaceSelector:
     # Match specific namespaces, or use 'any: true' to search all namespaces
     matchNames:
-      - default
+      - production
       - staging
 
   # ----------------------------------------------------------------------------

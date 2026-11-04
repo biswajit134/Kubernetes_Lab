@@ -30,7 +30,7 @@ kind: Pod
 
 metadata:
   name: init-demo-pod
-  namespace: default
+  namespace: production
   labels:
     app: inventory-service
 

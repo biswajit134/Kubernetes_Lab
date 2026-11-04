@@ -36,7 +36,7 @@ kind: CronJob
 
 metadata:
   name: daily-db-backup
-  namespace: default
+  namespace: production
   labels:
     purpose: automated-backup
     schedule: daily

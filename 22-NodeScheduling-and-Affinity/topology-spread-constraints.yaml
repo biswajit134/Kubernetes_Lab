@@ -28,7 +28,7 @@ kind: Deployment
 
 metadata:
   name: balanced-microservice
-  namespace: default
+  namespace: production
   labels:
     app: balanced-api
 

@@ -27,30 +27,31 @@ kind: Ingress
 
 metadata:
   name: main-app-ingress
-  namespace: default
+  namespace: production
   labels:
     app: api-gateway
+    environment: production
   annotations:
     # Controller specific annotations (example: ingress-nginx)
     nginx.ingress.kubernetes.io/rewrite-target: /
     nginx.ingress.kubernetes.io/ssl-redirect: "true"
     nginx.ingress.kubernetes.io/proxy-body-size: "10m"
     # Cert-Manager annotation for automated Let's Encrypt SSL certificates
-    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+    cert-manager.io/cluster-issuer: "letsencrypt-production"
 
 spec:
   # IngressClass indicates which Ingress Controller should implement this resource
   ingressClassName: nginx
 
   # ----------------------------------------------------------------------------
-  # TLS Configuration: Enables HTTPS termination at the ingress level
+  # TLS Configuration: Enables automated HTTPS termination at the ingress level
   # ----------------------------------------------------------------------------
   tls:
     - hosts:
         - api.mycompany.com
         - store.mycompany.com
-      # Name of the Secret containing tls.crt and tls.key
-      secretName: example-tls-cert
+      # Name of the Secret dynamically managed by cert-manager
+      secretName: production-tls-cert
 
   # ----------------------------------------------------------------------------
   # Routing Rules

@@ -27,7 +27,7 @@ kind: Pod
 
 metadata:
   name: ssd-workload-pod
-  namespace: default
+  namespace: production
   labels:
     app: fast-indexer
 

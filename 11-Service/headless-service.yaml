@@ -28,7 +28,7 @@ metadata:
   # Using a different name from the StatefulSet's embedded headless service
   # to avoid naming conflict when both are applied in the same namespace.
   name: postgres-headless
-  namespace: default
+  namespace: production
   labels:
     app: postgres-cluster
 

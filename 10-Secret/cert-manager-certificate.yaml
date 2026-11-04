@@ -1,0 +1,65 @@
+# ==============================================================================
+# TLS & Certificate Automation: Certificate (Cert-Manager CRD)
+# ==============================================================================
+# WHAT IS A CERTIFICATE RESOURCE?
+# A `Certificate` custom resource defines a desired X.509 certificate request.
+# It instructs cert-manager to communicate with the `ClusterIssuer`, solve the
+# challenge, obtain the signed certificate, and write it directly into a native
+# Kubernetes TLS Secret (`production-tls-cert`).
+#
+# AUTOMATED LIFECYCLE (ZERO HUMAN MAINTENANCE):
+# 1. Automatic Issuance: cert-manager orders, validates, and signs the certificate.
+# 2. Automatic Secret Creation: Populates `tls.crt` and `tls.key` in the target secret.
+# 3. Automatic 60-Day Renewal: Let's Encrypt certificates expire in 90 days.
+#    cert-manager automatically renews certificates at the 60-day mark!
+# 4. Ingress / Gateway Reload: Ingress-NGINX and Gateway API automatically reload
+#    the new certificate from the Secret without downtime.
+#
+# IMPORTANT CLI COMMANDS:
+# - Apply:             kubectl apply -f cert-manager-certificate.yaml
+# - Get Certificates:  kubectl get certificates -n production (or cert)
+# - View Issuance:     kubectl describe certificate production-tls-cert -n production
+# - Check Challenges:  kubectl get challenges -n production
+# - Verify Secret:     kubectl get secret production-tls-cert -n production
+# ==============================================================================
+
+apiVersion: cert-manager.io/v1
+kind: Certificate
+
+metadata:
+  name: production-tls-cert
+  namespace: production
+  labels:
+    tier: security-pki
+    app: api-gateway
+
+spec:
+  # The native Kubernetes Secret where cert-manager stores the issued cert and key
+  secretName: production-tls-cert
+
+  # Certificate validity and automatic renewal window
+  duration: 2160h    # 90 days validity
+  renewBefore: 720h  # Automatically renew 30 days before expiration
+
+  # ----------------------------------------------------------------------------
+  # Issuer Reference: Points to the ClusterIssuer defined in cert-manager-clusterissuer.yaml
+  # ----------------------------------------------------------------------------
+  issuerRef:
+    name: letsencrypt-production
+    kind: ClusterIssuer
+    group: cert-manager.io
+
+  # ----------------------------------------------------------------------------
+  # Subject Alternative Names (SANs)
+  # ----------------------------------------------------------------------------
+  dnsNames:
+    - api.mycompany.com
+    - store.mycompany.com
+
+  # Private Key Configuration (Modern cryptographic standards)
+  privateKey:
+    algorithm: RSA
+    encoding: PKCS1
+    size: 4096
+    rotationPolicy: Always # Generate a new private key on every renewal
+

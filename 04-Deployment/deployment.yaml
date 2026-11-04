@@ -29,7 +29,7 @@ kind: Deployment
 
 metadata:
   name: web-deployment
-  namespace: default
+  namespace: production
   labels:
     app.kubernetes.io/name: web-deployment
     app.kubernetes.io/part-of: online-store

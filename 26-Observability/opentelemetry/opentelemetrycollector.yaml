@@ -30,7 +30,7 @@ kind: OpenTelemetryCollector
 
 metadata:
   name: otel-collector
-  namespace: default
+  namespace: monitoring
   labels:
     tier: observability
     app: otel-collector
@@ -108,7 +108,7 @@ spec:
     exporters:
       # Export traces to Jaeger
       otlp/jaeger:
-        endpoint: "jaeger-collector.default.svc.cluster.local:4317"
+        endpoint: "jaeger-collector.monitoring.svc.cluster.local:4317"
         tls:
           insecure: true
 

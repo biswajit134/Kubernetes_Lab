@@ -30,7 +30,7 @@ kind: PodDisruptionBudget
 
 metadata:
   name: web-app-pdb
-  namespace: default
+  namespace: production
   labels:
     app: web-store
     tier: high-availability

@@ -25,7 +25,7 @@ kind: Pod
 
 metadata:
   name: multi-container-demo
-  namespace: default
+  namespace: production
   labels:
     pattern: sidecar
     app: order-service

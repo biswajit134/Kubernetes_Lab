@@ -31,7 +31,7 @@ kind: VirtualService
 
 metadata:
   name: reviews-route
-  namespace: default
+  namespace: production
   labels:
     app: reviews
     tier: service-mesh
@@ -40,7 +40,7 @@ spec:
   # The destination hosts to which traffic is being directed.
   # Can be internal Kubernetes DNS names or Gateway names.
   hosts:
-    - reviews.default.svc.cluster.local
+    - reviews.production.svc.cluster.local
     - reviews
 
   # The names of gateways and sidecars that should apply these routes.
@@ -48,7 +48,7 @@ spec:
   # If binding to an ingress gateway, include the gateway resource name here.
   gateways:
     - mesh
-    - default/public-gateway
+    - production/public-gateway
 
   # ----------------------------------------------------------------------------
   # HTTP Routing Rules (evaluated in top-down sequential order)

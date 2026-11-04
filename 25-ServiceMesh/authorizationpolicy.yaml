@@ -31,7 +31,7 @@ kind: AuthorizationPolicy
 
 metadata:
   name: secure-reviews-policy
-  namespace: default
+  namespace: production
   labels:
     tier: zero-trust-security
 
@@ -56,7 +56,7 @@ spec:
     - from:
         - source:
             # Cryptographic identity verified via mTLS certificate (SPIFFE ID)
-            principals: ["cluster.local/ns/default/sa/frontend-service-account"]
+            principals: ["cluster.local/ns/production/sa/frontend-service-account"]
       to:
         - operation:
             methods: ["GET"]

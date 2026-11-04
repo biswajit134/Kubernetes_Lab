@@ -26,7 +26,7 @@ kind: EnvoyFilter
 
 metadata:
   name: inject-custom-header-filter
-  namespace: default
+  namespace: production
   labels:
     tier: proxy-customization
 

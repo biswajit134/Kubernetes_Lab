@@ -30,14 +30,14 @@ kind: DestinationRule
 
 metadata:
   name: reviews-destination
-  namespace: default
+  namespace: production
   labels:
     app: reviews
     tier: service-mesh
 
 spec:
   # The target service (matching the Kubernetes Service name)
-  host: reviews.default.svc.cluster.local
+  host: reviews.production.svc.cluster.local
 
   # ----------------------------------------------------------------------------
   # Traffic Policy: Global rules applied across all subsets

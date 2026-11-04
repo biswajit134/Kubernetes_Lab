@@ -41,7 +41,7 @@ kind: Pod
 
 metadata:
   name: probe-demo-pod
-  namespace: default
+  namespace: production
   labels:
     app: robust-service
 

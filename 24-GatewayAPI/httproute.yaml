@@ -27,7 +27,7 @@ kind: HTTPRoute
 
 metadata:
   name: app-routes
-  namespace: default
+  namespace: production
   labels:
     app: api-gateway
     tier: routing
@@ -38,7 +38,7 @@ spec:
   # ----------------------------------------------------------------------------
   parentRefs:
     - name: main-gateway
-      namespace: default
+      namespace: production
       # Attach specifically to the HTTPS listener (by sectionName)
       sectionName: https-listener
 

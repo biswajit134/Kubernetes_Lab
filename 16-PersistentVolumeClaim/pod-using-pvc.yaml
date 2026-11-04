@@ -1,15 +1,13 @@
 # ==============================================================================
-# Kubernetes Manifest: Pod Using PersistentVolumeClaim
+# Kubernetes Manifest: Pod Using PersistentVolumeClaim (Production)
 # ==============================================================================
-# Shows how a Pod mounts and uses a PersistentVolumeClaim to persist data across
-# pod restarts, crashes, and reschedule events.
+# Shows how a Pod mounts and uses a PersistentVolumeClaim bound to cloud storage
+# to persist state across restarts, crashes, and reschedule events.
 #
 # IMPORTANT CLI COMMANDS:
 # - Apply:        kubectl apply -f pod-using-pvc.yaml
-# - Write file:   kubectl exec -it pvc-consumer-pod -- /bin/sh -c "echo 'Persisted Data' > /data/file.txt"
-# - Delete Pod:   kubectl delete pod pvc-consumer-pod
-# - Re-apply Pod: kubectl apply -f pod-using-pvc.yaml
-# - Verify file:  kubectl exec -it pvc-consumer-pod -- cat /data/file.txt (Data is still there!)
+# - Check mount:  kubectl exec -it pvc-consumer-pod -n production -- df -h /data
+# - View logs:    kubectl logs pvc-consumer-pod -n production
 # ==============================================================================
 
 apiVersion: v1
@@ -17,13 +15,14 @@ kind: Pod
 
 metadata:
   name: pvc-consumer-pod
-  namespace: default
+  namespace: production
   labels:
     app: persistent-worker
+    tier: production-data
 
 spec:
   # ----------------------------------------------------------------------------
-  # Volumes section referencing the PVC
+  # Volumes section referencing the production PVC
   # ----------------------------------------------------------------------------
   volumes:
     - name: storage-volume
@@ -36,7 +35,7 @@ spec:
       command: ["/bin/sh", "-c"]
       args:
         - >
-          echo "Pod started at $(date)" >> /data/access.log;
+          echo "Production worker started at $(date)" >> /data/access.log;
           echo "Viewing persistent history:";
           cat /data/access.log;
           while true; do
@@ -44,7 +43,7 @@ spec:
             sleep 10;
           done
 
-      # Mount the PVC storage at /data
+      # Mount the cloud storage volume at /data
       volumeMounts:
         - name: storage-volume
           mountPath: /data
@@ -56,4 +55,3 @@ spec:
         limits:
           cpu: "100m"
           memory: "128Mi"
-

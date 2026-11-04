@@ -27,7 +27,7 @@ kind: GRPCRoute
 
 metadata:
   name: grpc-service-routes
-  namespace: default
+  namespace: production
   labels:
     app: grpc-gateway
     protocol: grpc

@@ -28,7 +28,7 @@ kind: Sidecar
 
 metadata:
   name: scoped-reviews-sidecar
-  namespace: default
+  namespace: production
   labels:
     tier: performance-tuning
 
@@ -59,7 +59,7 @@ spec:
     # --- Listener: Only send configuration for services in this namespace,
     #     plus specific required external services (ratings and istio-system) ---
     - hosts:
-        - "./*"                  # All services in the current namespace ('default')
+        - "./*"                  # All services in the current namespace ('production')
         - "ratings/*"            # Services in the 'ratings' namespace
         - "istio-system/*"       # Telemetry and tracing services
 

@@ -30,7 +30,7 @@ kind: Pod
 
 metadata:
   name: advanced-affinity-pod
-  namespace: default
+  namespace: production
   labels:
     app: analytics-processor
 

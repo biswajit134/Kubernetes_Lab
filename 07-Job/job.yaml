@@ -29,7 +29,7 @@ kind: Job
 
 metadata:
   name: data-processing-job
-  namespace: default
+  namespace: production
   labels:
     app: batch-processor
     tier: data

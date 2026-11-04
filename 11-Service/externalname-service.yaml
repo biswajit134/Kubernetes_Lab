@@ -23,7 +23,7 @@ kind: Service
 
 metadata:
   name: external-database-service
-  namespace: default
+  namespace: production
   labels:
     app: external-db-adapter
 

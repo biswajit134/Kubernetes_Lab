@@ -22,7 +22,7 @@ kind: Prometheus
 
 metadata:
   name: lab-prometheus
-  namespace: default
+  namespace: monitoring
   labels:
     tier: monitoring
     prometheus: lab-prometheus

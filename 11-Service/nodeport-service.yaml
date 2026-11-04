@@ -24,7 +24,7 @@ kind: Service
 
 metadata:
   name: web-nodeport-service
-  namespace: default
+  namespace: production
   labels:
     app: web-frontend
 

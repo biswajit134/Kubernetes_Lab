@@ -30,7 +30,7 @@ kind: ReplicaSet
 
 metadata:
   name: frontend-replicaset
-  namespace: default
+  namespace: production
   labels:
     app: frontend
     tier: web

@@ -27,7 +27,7 @@ kind: ServiceEntry
 
 metadata:
   name: external-payment-api
-  namespace: default
+  namespace: production
   labels:
     tier: external-integration
 

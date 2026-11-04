@@ -30,7 +30,7 @@ apiVersion: v1
 kind: Service
 metadata:
   name: database-headless
-  namespace: default
+  namespace: production
   labels:
     app: database-cluster
 spec:
@@ -51,9 +51,10 @@ kind: StatefulSet
 
 metadata:
   name: database-cluster
-  namespace: default
+  namespace: production
   labels:
     app: database-cluster
+    tier: production-data
 
 spec:
   # The name of the Headless Service governing this StatefulSet
@@ -109,10 +110,13 @@ spec:
   volumeClaimTemplates:
     - metadata:
         name: data-storage
+        labels:
+          tier: production-data
       spec:
         accessModes: ["ReadWriteOnce"]
-        # In cloud clusters, specify storageClassName: "standard" or "gp3" or "fast"
+        # Production Cloud CSI StorageClass (AWS EBS gp3 / GKE Balanced PD)
+        storageClassName: fast-ssd-storage
         resources:
           requests:
-            storage: 5Gi
+            storage: 20Gi
 

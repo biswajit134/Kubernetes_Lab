@@ -32,7 +32,7 @@ kind: TLSRoute
 
 metadata:
   name: secure-passthrough-route
-  namespace: default
+  namespace: production
   labels:
     app: tls-passthrough
     protocol: tls

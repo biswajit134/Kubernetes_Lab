@@ -31,7 +31,7 @@ kind: Pod
 metadata:
   # Name must be unique within the namespace
   name: web-app-pod
-  namespace: default
+  namespace: production
   # Labels allow controllers, services, and queries to select this Pod
   labels:
     app.kubernetes.io/name: web-app

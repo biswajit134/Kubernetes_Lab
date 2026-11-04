@@ -28,7 +28,7 @@ kind: GrafanaDashboard
 
 metadata:
   name: cluster-compute-dashboard
-  namespace: default
+  namespace: monitoring
   labels:
     dashboards: "default"
     tier: visualization

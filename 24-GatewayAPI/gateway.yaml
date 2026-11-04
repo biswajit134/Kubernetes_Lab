@@ -35,7 +35,7 @@ kind: Gateway
 
 metadata:
   name: main-gateway
-  namespace: default
+  namespace: production
   labels:
     app: api-gateway
     tier: networking
@@ -78,10 +78,10 @@ spec:
         # - Passthrough: Gateway forwards encrypted traffic directly to backends
         mode: Terminate
         certificateRefs:
-          # Reference to a Kubernetes Secret containing tls.crt and tls.key
+          # Reference to the cert-manager automated TLS Secret
           - kind: Secret
-            name: api-tls-cert
-            namespace: default
+            name: production-tls-cert
+            namespace: production
       allowedRoutes:
         namespaces:
           from: Same

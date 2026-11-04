@@ -28,7 +28,7 @@ kind: Jaeger
 
 metadata:
   name: jaeger-instance
-  namespace: default
+  namespace: monitoring
   labels:
     app: jaeger
     tier: distributed-tracing
